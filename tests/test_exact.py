@@ -190,6 +190,35 @@ def test_near_constant_negative_cost(n):
     assert_certified(res, q)
 
 
+@pytest.mark.parametrize(
+    "gen",
+    [lambda: gaussian_clouds(30, 30, separation=2.0, seed=3), lambda: random_cost(12, 9, seed=5)],
+    ids=["gaussian_clouds", "random_cost"],
+)
+def test_row_column_shift_has_same_plan(gen):
+    # D2: C - alpha 1^T - 1 beta^T changes every admissible plan's cost by the
+    # constant <a, alpha> + <b, beta>, so the optimal plan is unchanged.
+    p = gen()
+    alpha = p.C.min(axis=1)
+    S = p.C - alpha[:, None]
+    beta = S.min(axis=0)
+    S = S - beta[None, :]
+    assert np.all(S.min(axis=1) == 0) and np.all(S.min(axis=0) == 0)
+    base, shifted = solve_exact(p), solve_exact(make(p.a, p.b, S))
+    assert shifted.cost == pytest.approx(base.cost - p.a @ alpha - p.b @ beta, abs=1e-12)
+    np.testing.assert_allclose(shifted.plan, base.plan, atol=1e-15)
+
+
+@pytest.mark.parametrize("separation", [1.0, 4.0, 16.0])
+def test_separation_does_not_change_exact_plan(separation):
+    # For squared Euclidean cost, translating the target adds a term in i plus
+    # a term in j, so the optimal plan is the same for every separation
+    # (DECISIONS.md, D4 open point). Same seed -> same base points.
+    base = solve_exact(gaussian_clouds(30, 30, seed=0)).plan
+    moved = solve_exact(gaussian_clouds(30, 30, separation=separation, seed=0)).plan
+    np.testing.assert_allclose(moved, base, atol=1e-15)
+
+
 # --- the wrapper never returns a corrupted answer --------------------------
 
 def test_rejects_mass_mismatch_that_pot_would_rescale():

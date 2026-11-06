@@ -112,3 +112,45 @@ Verification:
   failed), median/max swapped (4), normalization not applied (4), c_scale
   not recorded (4), unknown value silently treated as none (4).
   Restored → 117 passed.
+
+## 2026-11-06 — Row/column shift (D2 revised), random_cost normalize, implementation.md
+
+Author directives: keep `normalize="none"` default; `random_cost` needs
+`normalize` so both families share one ε axis; D2 changes from a global
+min-shift to a row-then-column shift; reflect the new failure predictor;
+`implementation.md` may be updated; the `ot` import line stays (still only
+`exact.py`).
+
+Changes:
+- `problems.py`: shared `_normalize(C, normalize) -> (C / s, s)`;
+  `random_cost(n, m, normalize="none", seed=0)` records `normalize`, `c_scale`.
+- `tests/test_problems.py`: random_cost normalization tests; unknown-value
+  rejection for both generators.
+- `tests/test_exact.py`: `test_row_column_shift_has_same_plan` (D2 claim on
+  the baseline), `test_separation_does_not_change_exact_plan`.
+- `DECISIONS.md`: D2 rewritten for the row/column shift (proof that every
+  row and column gets an exact 0; duals reported as f + α, g + β; shift on
+  the support; predictor `C_shift.max()/eps`; exact.py's scalar shift kept
+  as an independent workaround). D4: random_cost normalize; open point on
+  separation and figure 3.
+- `implementation.md`: generator signatures, D1/D2 notes on the solver
+  contract, figure table (fig3_stability.py, fig4_timing.py replace
+  fig3_success_map.py and timing_crossover.py), predictor list, CSV
+  columns (+ normalize, c_scale, c_min, c_shift_max, cpu).
+  `exact.py`-only `ot` import line left as is.
+
+Finding — separation does not change the problem for squared Euclidean cost:
+- Moving the target by s·e₁ adds a term in i plus a term in j, so plans are
+  invariant. Exact plans at n = 50, seed 0, s ∈ {0,1,2,4,8,16}: bit-identical.
+- Raw range max C − min C: 26.0 → 265.7 (s = 0 → 16). Row/column-shifted
+  max: 24.7 → 36.7. The D2 shift absorbs most of the separation's numerical
+  effect. Flagged to the author for figure 3.
+- Row/column shift checked at n = 50 on gaussian (s = 0, 4, 4 median) and
+  random_cost: every row and column has an exact 0, all entries ≥ 0.
+
+Verification:
+- `ruff check .` passed; `pytest -q -W error::UserWarning` 139 passed.
+- Mutations (scratch copy), all caught: random_cost ignores normalize (8
+  failed); random_cost c_scale fixed at 1 (4); helper median→mean (6);
+  helper accepts unknown values (8); separation added on all axes (1).
+  Restored → 139 passed.

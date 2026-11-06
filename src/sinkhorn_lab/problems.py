@@ -77,6 +77,26 @@ def _sq_dists(x: np.ndarray, y: np.ndarray) -> np.ndarray:
 NORMALIZATIONS = ("none", "median", "max")
 
 
+def _normalize(C: np.ndarray, normalize: str) -> tuple[np.ndarray, float]:
+    """Divide C by the scale named by ``normalize`` (DECISIONS.md, D4).
+
+    Returns (C / s, s). "none": s = 1; "median": s = median(C); "max": s = max(C).
+    Normalizing is a multiplication, so it changes the effective epsilon:
+    (C / s, eps) is the same entropic problem as (C, s * eps).
+    """
+    if normalize not in NORMALIZATIONS:
+        raise ValueError(f"normalize must be one of {NORMALIZATIONS}, got {normalize!r}")
+    if normalize == "median":
+        c_scale = float(np.median(C))
+    elif normalize == "max":
+        c_scale = float(C.max())
+    else:
+        c_scale = 1.0
+    if not c_scale > 0:
+        raise ValueError(f"cannot normalize by {normalize}: scale is {c_scale!r}")
+    return C / c_scale, c_scale
+
+
 def gaussian_clouds(n, m, d=2, separation=0.0, normalize="none", seed=0) -> Problem:
     """Two standard Gaussian clouds in R^d with uniform weights.
 
@@ -89,25 +109,13 @@ def gaussian_clouds(n, m, d=2, separation=0.0, normalize="none", seed=0) -> Prob
     - "max":    C / max(C), so the largest cost is 1.
 
     The divisor is stored in meta["c_scale"]; raw C = C * meta["c_scale"].
-    Normalizing is a multiplication, so it changes the effective epsilon:
-    (C / s, eps) is the same entropic problem as (C, s * eps).
+    See ``_normalize`` for how normalization changes the effective epsilon.
     """
-    if normalize not in NORMALIZATIONS:
-        raise ValueError(f"normalize must be one of {NORMALIZATIONS}, got {normalize!r}")
     rng = np.random.default_rng(seed)
     x = rng.standard_normal((n, d))
     y = rng.standard_normal((m, d))
     y[:, 0] += separation
-    C = _sq_dists(x, y)
-    if normalize == "median":
-        c_scale = float(np.median(C))
-    elif normalize == "max":
-        c_scale = float(C.max())
-    else:
-        c_scale = 1.0
-    if not c_scale > 0:
-        raise ValueError(f"cannot normalize by {normalize}: scale is {c_scale!r}")
-    C = C / c_scale
+    C, c_scale = _normalize(_sq_dists(x, y), normalize)
     a = np.full(n, 1.0 / n)
     b = np.full(m, 1.0 / m)
     meta = {
@@ -125,13 +133,25 @@ def gaussian_clouds(n, m, d=2, separation=0.0, normalize="none", seed=0) -> Prob
     return _make(a, b, C, meta)
 
 
-def random_cost(n, m, seed=0) -> Problem:
-    """Unstructured cost C_ij ~ U[0, 1) i.i.d., uniform weights."""
+def random_cost(n, m, normalize="none", seed=0) -> Problem:
+    """Unstructured cost C_ij ~ U[0, 1) i.i.d., uniform weights.
+
+    ``normalize`` is as in ``gaussian_clouds`` ("none", "median", "max"), so
+    both families can share one epsilon axis (DECISIONS.md, D4). The divisor
+    is stored in meta["c_scale"].
+    """
     rng = np.random.default_rng(seed)
-    C = rng.random((n, m))
+    C, c_scale = _normalize(rng.random((n, m)), normalize)
     a = np.full(n, 1.0 / n)
     b = np.full(m, 1.0 / m)
-    meta = {"name": "random_cost", "seed": seed, "n": n, "m": m}
+    meta = {
+        "name": "random_cost",
+        "seed": seed,
+        "n": n,
+        "m": m,
+        "normalize": normalize,
+        "c_scale": c_scale,
+    }
     return _make(a, b, C, meta)
 
 

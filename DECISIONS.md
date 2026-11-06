@@ -62,14 +62,30 @@ duals of zero-weight points as NaN.
 
 ---
 
-## D2. Cost is shifted by its minimum before forming the Gibbs kernel
+## D2. Cost is shifted by row and column minima before forming the Gibbs kernel
 
-*Status: decided by the author, 2026-11-06.*
+*Status: decided by the author, 2026-11-06. The first version, a single
+global shift C − min C, was revised the same day to the row-then-column
+shift below.*
 
-**Decision.** The solvers form the kernel from C̃ = C − c_min·11ᵀ, where
-c_min = minᵢⱼ Cᵢⱼ, so that K̃ = exp(−C̃/ε) has entries in (0, 1]. The
-largest entry equals exp(0) = 1, at the position of the minimum cost. This is
-a translation of C, not a multiplication, so the effective ε is unchanged.
+**Decision.** On the support (after D1 drops zero weights), the solvers form
+the kernel from the doubly shifted cost
+
+  αᵢ = minⱼ Cᵢⱼ,  βⱼ = minᵢ (Cᵢⱼ − αᵢ),  C̃ᵢⱼ = Cᵢⱼ − αᵢ − βⱼ,
+
+which in code is `C_shift = C - C.min(axis=1, keepdims=True)` followed by
+`C_shift = C_shift - C_shift.min(axis=0, keepdims=True)`.
+
+- *Every row and every column of C̃ contains an exact 0, and C̃ ≥ 0.* After
+  the row step, each row has a 0 at its minimum and all entries are ≥ 0.
+  Each column of the row-shifted matrix therefore has a minimum βⱼ ≥ 0.
+  Subtracting it puts a 0 in every column. A row's existing zero sits in a
+  column whose minimum is already 0, so it is untouched.
+- *So every row and every column of K̃ = exp(−C̃/ε) has an entry exactly
+  equal to exp(0) = 1.*
+- These are translations of C, not multiplications, so the effective ε is
+  unchanged.
+
 The shift does not replace the log-sum-exp (log-domain) iteration. It gives
 the vanilla solver a better-conditioned starting kernel, so ε can be pushed
 closer to 0 before the log-domain method, and its cost, becomes necessary.
@@ -77,64 +93,80 @@ closer to 0 before the log-domain method, and its cost, becomes necessary.
 **Reasoning.**
 
 - *The shift changes nothing about the solution.* For any P ∈ U(a, b),
-  ⟨P, C̃⟩ = ⟨P, C⟩ − c_min·Σᵢⱼ Pᵢⱼ = ⟨P, C⟩ − c_min·⟨a, 1⟩, a constant on
-  U(a, b).
-  - The exact problem and the entropic problem ⟨P, C⟩ − εH(P) therefore have
-    the same minimizers for C̃ as for C.
-  - (f, g) is optimal for C̃ if and only if (f, g + c_min) is optimal for C,
-    up to the usual (f + α, g − α) freedom.
-  - The objective value shifts by exactly c_min·⟨a, 1⟩.
-- *Why it helps.* K̃ = e^{c_min/ε}·K is a uniform rescaling of K, and Sinkhorn
-  absorbs a uniform factor into the scalings: diag(u)·K̃·diag(v) =
-  diag(e^{c_min/ε}u)·K·diag(v). Mathematically nothing changes. In floating
-  point, though, K itself may not be representable. If c_min/ε is large, for
-  example c_min = 10 and ε = 0.01, then every entry of K is at most
-  e^{−1000}, which is 0 in float64. The whole kernel underflows even though
-  the problem is perfectly well conditioned relative to its own costs. After
-  the shift the kernel always contains a 1, and an entry underflows only if
-  its own excess cost (Cᵢⱼ − c_min)/ε is large.
+  ⟨P, C̃⟩ = ⟨P, C⟩ − Σᵢ αᵢ Σⱼ Pᵢⱼ − Σⱼ βⱼ Σᵢ Pᵢⱼ = ⟨P, C⟩ − ⟨a, α⟩ − ⟨b, β⟩,
+  a constant on U(a, b). The exact problem and the entropic problem
+  ⟨P, C⟩ − εH(P) therefore have the same minimizers for C̃ as for C.
+  - (f, g) is optimal for C̃ if and only if (f + α, g + β) is optimal for C,
+    up to the usual (f + c, g − c) freedom.
+  - The objective value shifts by exactly ⟨a, α⟩ + ⟨b, β⟩.
+  - The argument holds for any α, β; the minima are one particular choice.
+- *Why it helps.* K̃ = diag(e^{α/ε})·K·diag(e^{β/ε}), and Sinkhorn absorbs
+  diagonal factors into its scalings: diag(u)·K̃·diag(v) =
+  diag(e^{α/ε}u)·K·diag(e^{β/ε}v). Mathematically nothing changes. In
+  floating point, though, K itself may not be representable.
+  - If a row's smallest cost satisfies αᵢ/ε ≳ 745, the whole row of K
+    underflows to 0. Then (Kv)ᵢ = 0 and the update uᵢ = aᵢ/(Kv)ᵢ divides by
+    zero, even though nothing about the problem is degenerate.
+  - The same holds for columns and (Kᵀu)ⱼ.
+  - After the shift, every row and column of K̃ contains a 1. So
+    (K̃v)ᵢ ≥ v_{j*(i)} > 0, where j*(i) is the column of row i's zero, and
+    likewise for (K̃ᵀu)ⱼ. Neither sum can underflow to 0 on the first
+    iterations.
+- *A single global shift was weaker.* Subtracting only min C guarantees one
+  entry equal to 1 in the whole kernel. Any row whose own minimum lies far
+  above the global minimum can still underflow. The row and column shift
+  guarantees a 1 per row and per column.
 - *Underflow depends on the ratio of cost to ε, not on either alone.* In
   float64, exp(−x) leaves the normal range for x > 708.4 (log of the smallest
-  normal number) and becomes exactly 0 for x ≳ 745.1. After the shift, every
-  entry of K̃ is a normal number exactly when (max C − min C)/ε < 708.4. So
-  the threshold depends on the cost range divided by ε. Scaling C and ε
-  together by the same factor leaves K̃ unchanged, and adding a constant to C
-  leaves it unchanged too. Neither C nor ε alone determines underflow. The
-  author's derivations (`docs/derivation.md`, to be uploaded) develop this.
-- *What the shift does not fix.*
-  - Only one entry is guaranteed to equal 1. A row i whose smallest excess
-    cost satisfies minⱼ C̃ᵢⱼ/ε ≳ 745 still has an all-zero row in K̃, giving
-    (K̃v)ᵢ = 0 and a division by zero.
-  - The scalings u and v can still overflow or underflow over the iterations
-    as ε → 0.
-
+  normal number) and becomes exactly 0 for x ≳ 745.1.
+  - After the shift, an entry of K̃ underflows only if its reduced cost C̃ᵢⱼ/ε
+    is large.
+  - Every entry of K̃ is a normal number exactly when max C̃ / ε < 708.4.
+  - Scaling C and ε together by the same factor leaves K̃ unchanged, and
+    adding any α 1ᵀ + 1 βᵀ to C leaves it unchanged too. Neither C nor ε alone
+    determines underflow.
+  - The author's derivations (`docs/derivation.md`, to be uploaded) develop
+    this.
+- *What the shift does not fix.* The scalings u and v can still overflow or
+  underflow over the iterations as ε → 0. Entries with large C̃ᵢⱼ/ε still
+  underflow individually, which can starve the sums of all but one term.
   These are what the in-loop log-sum-exp stabilization handles, at its extra
   computational cost.
 
-**Consequences and open points.**
+**Consequences.**
 
-- The exact baseline (`exact.py`) also shifts by the support's minimum cost
-  before calling `ot.emd`. Raw `ot.emd` falsely reports "Problem infeasible"
-  when all costs are negative and roughly constant below −N/(N−1),
-  N = n + m (see `AGENTS_LOG.md`). The plan is unchanged by the argument
-  above, min C is added back to g, and the cost and certificate are computed
-  on the original C.
-- *Reported quantities (author, 2026-11-06):* solvers report cost and duals
-  on the original C, i.e. cost ⟨P, C⟩ and duals (f, g + c_min). The shift is
+- *Reported quantities (author, 2026-11-06).* Solvers report cost and duals
+  on the original C: cost ⟨P, C⟩ and duals (f + α, g + β). The shift is
   internal to the solver. This matches `solve_exact`, so stage 2 tests
   compare directly.
-- *Open (author):* `implementation.md` lists `C.max() / eps` as a candidate
-  failure predictor for the timing experiment. Under D2, the quantity the
-  argument above points to is the shifted range `(C.max() − C.min()) / eps`.
-  The two coincide when min C ≈ 0, which is nearly true for the current
-  generators. `implementation.md` has not been changed.
+- *Shift on the support.* α and β are computed after zero weights are
+  dropped (D1), on C restricted to the support. Computing them on the full C
+  would still be a valid shift, but rows or columns with zero weight could
+  set βⱼ or αᵢ and remove the exact zero on the support.
+- *Likely failure predictor.* By the argument above, the quantity that
+  controls underflow is the reduced cost range relative to ε,
+  `C_shift.max() / eps`. Under the earlier global shift it was
+  `(C.max() − C.min()) / eps`. The two can differ a lot (see D4, open
+  point). The timing experiment in `implementation.md` tests
+  `C_shift.max() / eps` as the expected strong predictor, alongside
+  `C.max() / eps` and `eps` alone, and does not assume any of them.
+- *The exact baseline uses its own, independent shift.* `exact.py` subtracts
+  only the scalar min C on the support before calling `ot.emd`. Raw `ot.emd`
+  falsely reports "Problem infeasible" when all costs are negative and
+  roughly constant below −N/(N−1), N = n + m (see `AGENTS_LOG.md`), and the
+  scalar shift is enough to avoid that. min C is added back to g, and the
+  cost and certificate are computed on the original C. This is a workaround
+  in the baseline, not part of the solvers' design. The tests also check
+  that the row and column shift leaves the exact plan unchanged
+  (`test_row_column_shift_has_same_plan`).
 
 ---
 
 ## D3. The exact baseline returns only certified answers
 
 *Status: requirement from the author, 2026-11-06. The mechanism was proposed
-by the agent and confirmed by the author, including the min-shift in D2.*
+by the agent and confirmed by the author, including the scalar min-shift
+workaround (D2, Consequences).*
 
 **Decision.** `solve_exact` must always return the exact LP optimum, and
 the wrapper itself must be able to show that float handling of the weights
@@ -190,12 +222,32 @@ what an ε sweep means. Per figure:
 | 4. Timing | median(C) | Same as figure 1. The median's stability in n keeps ε comparable as n varies. |
 
 **Implementation.** `gaussian_clouds(..., normalize="none" | "median" | "max")`
-replaces the `scale_c` flag from `implementation.md`. The divisor is stored in
+replaces the earlier `scale_c` flag. The divisor is stored in
 `meta["c_scale"]`, so raw C = C · `meta["c_scale"]`. The default is `"none"`,
 so normalization only happens when an experiment script asks for it.
 Normalization is applied before validation. The solver's D2 shift then acts
 on the normalized C.
 
-**Interaction with D2.** Under max normalization max C = 1. With min C ≈ 0,
-the D2 underflow quantity (max C − min C)/ε then reduces to about 1/ε. Under
-median normalization it is the cost range in units of the median.
+`random_cost(..., normalize=...)` takes the same argument, so both families
+can be placed on one ε axis.
+
+**Interaction with D2.** Normalization divides C̃ by the same s, so the D2
+predictor C̃_max/ε becomes C̃_max/(s·ε) in raw units. Under max normalization
+C̃_max ≤ 1, so the predictor is at most 1/ε.
+
+**Open (author): separation and figure 3.**
+- *Separation leaves the problem itself unchanged.* For squared Euclidean
+  cost, moving the target by s·e₁ changes Cᵢⱼ by −2s(xᵢ₁ − zⱼ₁) + s²: a term
+  in i plus a term in j. By the D2 argument, the exact plan and every
+  entropic plan are therefore identical for every separation. Checked for
+  the exact plan at n = 50, s ∈ {0, 1, 2, 4, 8, 16}: the plans are
+  bit-identical. Regression test: `test_separation_does_not_change_exact_plan`.
+- *Separation affects the numerics only, and the D2 shift absorbs most of
+  it.* At n = 50 (seed 0), the raw range max C − min C grows from 26.0 at
+  s = 0 to 265.7 at s = 16. The row-and-column-shifted range C̃_max only
+  grows from 24.7 to 36.7.
+- *Consequence.* A raw-C stability figure will show separation dependence
+  mostly through the size of the costs. A vanilla solver that applies the
+  D2 shift internally may show much weaker dependence on separation than
+  the raw range suggests. That may be the intended finding, or it may call
+  for plotting against C̃_max/ε or a different axis. The author decides.

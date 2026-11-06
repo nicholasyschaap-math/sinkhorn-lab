@@ -16,6 +16,8 @@ GENERATORS = [
     ("gaussian_clouds_median", lambda seed: gaussian_clouds(5, 5, normalize="median", seed=seed)),
     ("gaussian_clouds_max", lambda seed: gaussian_clouds(5, 5, normalize="max", seed=seed)),
     ("random_cost", lambda seed: random_cost(4, 6, seed=seed)),
+    ("random_cost_median", lambda seed: random_cost(4, 6, normalize="median", seed=seed)),
+    ("random_cost_max", lambda seed: random_cost(4, 6, normalize="max", seed=seed)),
     ("uniform_1d", lambda seed: uniform_1d(8, seed=seed)),
 ]
 IDS = [name for name, _ in GENERATORS]
@@ -112,10 +114,35 @@ def test_gaussian_clouds_normalizations_share_points():
         np.testing.assert_array_equal(p.meta["y"], ps[0].meta["y"])
 
 
+@pytest.mark.parametrize("gen", [gaussian_clouds, random_cost], ids=["gaussian_clouds", "random_cost"])
 @pytest.mark.parametrize("bad", ["mean", "Median", None, True])
-def test_gaussian_clouds_rejects_unknown_normalization(bad):
+def test_rejects_unknown_normalization(gen, bad):
     with pytest.raises(ValueError, match="normalize"):
-        gaussian_clouds(4, 4, normalize=bad, seed=0)
+        gen(4, 4, normalize=bad, seed=0)
+
+
+def test_random_cost_default_is_raw_cost():
+    p = random_cost(6, 5, seed=2)
+    assert p.meta["normalize"] == "none" and p.meta["c_scale"] == 1.0
+    np.testing.assert_array_equal(p.C, np.random.default_rng(2).random((6, 5)))
+
+
+@pytest.mark.parametrize("n, m", [(6, 6), (7, 4), (50, 50)])
+def test_random_cost_median_normalization(n, m):
+    raw = random_cost(n, m, seed=2)
+    med = random_cost(n, m, normalize="median", seed=2)
+    assert np.median(med.C) == pytest.approx(1.0, rel=1e-12)
+    assert med.meta["c_scale"] == pytest.approx(np.median(raw.C), rel=1e-12)
+    np.testing.assert_allclose(med.C, raw.C / np.median(raw.C), rtol=1e-12)
+    np.testing.assert_allclose(med.C * med.meta["c_scale"], raw.C, rtol=1e-12)
+
+
+def test_random_cost_max_normalization():
+    raw = random_cost(6, 9, seed=2)
+    mx = random_cost(6, 9, normalize="max", seed=2)
+    assert mx.C.max() == pytest.approx(1.0, rel=1e-12)
+    assert mx.meta["c_scale"] == pytest.approx(raw.C.max(), rel=1e-12)
+    np.testing.assert_allclose(mx.C, raw.C / raw.C.max(), rtol=1e-12)
 
 
 def test_uniform_1d_stores_points_and_cost():
