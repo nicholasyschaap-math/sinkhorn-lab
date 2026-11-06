@@ -24,3 +24,21 @@ Verification (fresh clone + fresh venv in scratch, Python 3.13.7):
   `__init__.py` → 3 failed. Restored → 3 passed.
 
 Not verified: the workflow on GitHub runners (pending push).
+
+## 2026-11-06 — Rules file rename, metrics.py ownership, CLAUDE.md imports
+
+Task: give the author ownership of metrics.py in the rules, rename the
+rules file for compatibility, and load implementation.md in every session.
+
+Changes:
+- `Agents.md` → `AGENTS.md` (matches the reference in implementation.md;
+  Linux file systems are case-sensitive). Content otherwise unchanged
+  except the next item.
+- `AGENTS.md` Rules: the hand-written-file rule now covers
+  `src/sinkhorn_lab/metrics.py` as well as `solvers.py` (wording made plural).
+- `CLAUDE.md`: imports `@AGENTS.md` and `@implementation.md`.
+
+Held, per author: implementation.md still says exact.py is the only file
+that imports `ot`, until the author decides whether solvers/metrics need it.
+
+Verification: `ruff check .` passed; `pytest -q` 3 passed.
