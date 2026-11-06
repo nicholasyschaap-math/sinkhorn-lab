@@ -11,7 +11,7 @@ Entropic optimal transport with Sinkhorn: vanilla and log-domain solvers.
 
 # Rules
 
-- Do not edit src/sinkhornlab/solvers.py unless explicitly asked. Its
+- Do not edit src/sinkhorn_lab/solvers.py unless explicitly asked. Its
   author primarily writes it by hand. If asked to make edits you may not
   commit any to main without author approval. You must be extra rigorous
   in your reports on edits made here if asked.
