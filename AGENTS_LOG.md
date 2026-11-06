@@ -85,3 +85,30 @@ Verification:
   → 3; ignore POT warning → 1; flip reduced-cost sign → 54; generator uses
   global RNG → 1; drop equal-mass check → 3; uniform_1d |x−y| not (x−y)² → 21.
   Restored → 99 passed.
+
+## 2026-11-06 — Stage 1 baseline committed; normalize argument; D4
+
+Author answers: NaN duals off support in exact.py; keep the certificate and
+the min-shift; solvers report on original C; replace `scale_c` with
+per-figure normalization; figure set is now four (D4).
+
+Changes:
+- `src/sinkhorn_lab/problems.py`: as logged above, with
+  `gaussian_clouds(..., normalize="none" | "median" | "max")` replacing
+  `scale_c`; divisor stored in `meta["c_scale"]`; default "none" (agent
+  choice: experiment scripts set it explicitly per D4).
+- `src/sinkhorn_lab/exact.py`: as logged above.
+- `tests/test_problems.py`, `tests/test_exact.py`: normalize tests replace the
+  scale_c test; exact tests run on median- and max-normalized clouds.
+- `DECISIONS.md`: D1 exact convention confirmed; D2 reported quantities
+  resolved (original C); D3 confirmed; D4 added (figures, normalization).
+
+Not changed: `implementation.md` still lists `scale_c`, three figures plus
+the timing script, and `C.max() / eps` as a predictor (flagged to author).
+
+Verification:
+- `ruff check .` passed; `pytest -q -W error::UserWarning` 117 passed.
+- Normalization mutations (scratch copy), all caught: median→mean (3
+  failed), median/max swapped (4), normalization not applied (4), c_scale
+  not recorded (4), unknown value silently treated as none (4).
+  Restored → 117 passed.

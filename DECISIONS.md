@@ -56,8 +56,8 @@ duals of zero-weight points as NaN.
   to relative tolerance 1e-12.
 - `exact.solve_exact` follows the same convention: it solves on the support
   and returns NaN duals off the support. POT's own `ot.emd` would instead
-  fill those duals with estimated finite values. *(Agent proposal for the
-  baseline, awaiting author confirmation.)*
+  fill those duals with estimated finite values. *(Confirmed by the author,
+  2026-11-06.)*
 - `solvers.py` (author) will implement it for both Sinkhorn variants.
 
 ---
@@ -119,9 +119,10 @@ closer to 0 before the log-domain method, and its cost, becomes necessary.
   N = n + m (see `AGENTS_LOG.md`). The plan is unchanged by the argument
   above, min C is added back to g, and the cost and certificate are computed
   on the original C.
-- *Open (author):* should solvers report cost and duals on the original C
-  (⟨P, C⟩, g + c_min) or on C̃? This affects how stage 2 tests compare solver
-  output with `solve_exact`, which reports on the original C.
+- *Reported quantities (author, 2026-11-06):* solvers report cost and duals
+  on the original C, i.e. cost ⟨P, C⟩ and duals (f, g + c_min). The shift is
+  internal to the solver. This matches `solve_exact`, so stage 2 tests
+  compare directly.
 - *Open (author):* `implementation.md` lists `C.max() / eps` as a candidate
   failure predictor for the timing experiment. Under D2, the quantity the
   argument above points to is the shifted range `(C.max() − C.min()) / eps`.
@@ -132,8 +133,8 @@ closer to 0 before the log-domain method, and its cost, becomes necessary.
 
 ## D3. The exact baseline returns only certified answers
 
-*Status: requirement from the author, 2026-11-06. Mechanism proposed by the
-agent.*
+*Status: requirement from the author, 2026-11-06. The mechanism was proposed
+by the agent and confirmed by the author, including the min-shift in D2.*
 
 **Decision.** `solve_exact` must always return the exact LP optimum, and
 the wrapper itself must be able to show that float handling of the weights
@@ -157,3 +158,44 @@ did not corrupt it. Otherwise it raises `ExactSolverError`.
   Each condition is checked to `tol`, scaled by max(1, max|C|) for the dual
   conditions. Feasibility alone, which is what `implementation.md` asks for,
   would not detect a feasible but suboptimal plan.
+
+---
+
+## D4. Figure set and per-figure cost normalization
+
+*Status: decided by the author, 2026-11-06.*
+
+**Figures.** There are four figures (this supersedes the three-figure plan in
+`implementation.md`):
+
+1. **Cost gap.**
+2. **Iterations.**
+3. **Stability: ε against separation.** One panel per method, at a fixed
+   small n of about 50.
+4. **Timing.** Cost per iteration on the left, time to convergence on the
+   right. This takes over the timing experiment described in
+   `implementation.md`.
+
+**Normalization.** Generators can divide the cost by a scale s:
+C ← C / s. This is a multiplication, unlike the D2 shift, so it changes the
+effective regularization: (C / s, ε) is the same entropic problem as
+(C, s·ε). Normalizing therefore fixes the units of ε, and choosing s chooses
+what an ε sweep means. Per figure:
+
+| Figure | Normalization | Reason |
+|---|---|---|
+| 1. Cost gap | median(C) | Puts ε in units of a typical cost. The median is fairly constant in n. |
+| 2. Iterations | median(C); max(C) as a separate check | Median is primary. The run is repeated with max normalization to check whether the separation seen under median remains the same; the result is reported either way. |
+| 3. Stability vs separation | none (raw C) | Normalizing would divide out the cost growth that separation causes: the median and max of the squared distances grow with separation. Raw C keeps the separation in the cost scale, at a fixed small n of about 50. |
+| 4. Timing | median(C) | Same as figure 1. The median's stability in n keeps ε comparable as n varies. |
+
+**Implementation.** `gaussian_clouds(..., normalize="none" | "median" | "max")`
+replaces the `scale_c` flag from `implementation.md`. The divisor is stored in
+`meta["c_scale"]`, so raw C = C · `meta["c_scale"]`. The default is `"none"`,
+so normalization only happens when an experiment script asks for it.
+Normalization is applied before validation. The solver's D2 shift then acts
+on the normalized C.
+
+**Interaction with D2.** Under max normalization max C = 1. With min C ≈ 0,
+the D2 underflow quantity (max C − min C)/ε then reduces to about 1/ε. Under
+median normalization it is the cost range in units of the median.
