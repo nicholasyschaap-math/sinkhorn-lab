@@ -8,6 +8,19 @@ version = "0.0.0"
 description = "Entropic optimal transport with Sinkhorn: vanilla and log-domain solvers."
 license = "MIT"
 license-files = ["LICENSE"]
+requires-python = ">=3.12"
+dependencies = [
+    "numpy",
+    "scipy",
+    "pot",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff",
+    "matplotlib",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
