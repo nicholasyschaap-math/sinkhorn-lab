@@ -154,3 +154,22 @@ Verification:
   failed); random_cost c_scale fixed at 1 (4); helper median→mean (6);
   helper accepts unknown values (8); separation added on all axes (1).
   Restored → 139 passed.
+
+## 2026-11-06 — Commit author's solvers.py (vanilla + log domain); .gitignore
+
+Committed on the author's explicit approval. `solvers.py` body is
+author-written; my only edits to it were the import lines
+(`dataclass`, `numpy`, `scipy.special.logsumexp`), added when asked.
+`metrics.py` (one prompted `import numpy` line) is left uncommitted at the
+author's instruction; it would fail ruff F401 until used.
+
+- `.gitignore`: added `.DS_Store` (author request).
+- `src/sinkhorn_lab/solvers.py`: `SinkhornResult`, `rowcol_shift`,
+  `softmin`, `slack`, `vanilla_sinkhorn`, `log_sinkhorn`.
+
+Verification before commit:
+- `ruff check src/sinkhorn_lab/solvers.py` passed; `pytest -q` 139 passed.
+- Real file, warnings as errors: `max_iter=0` and `3` report err equal to
+  the true row error of the returned P in both solvers (96.04, 1.4307);
+  vanilla and log agree at ε = 0.5 (89 iterations each, plans within
+  2.4e-17); vanilla at ε = 0.01 returns `numerical_failure`.
