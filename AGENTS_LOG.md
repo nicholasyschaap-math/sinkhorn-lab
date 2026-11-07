@@ -387,3 +387,98 @@ the author's direction, not on `main`; the author will check the code.
   bound. Over 20 runs on 4 problems the bound never exceeded the LP. Its
   overpay estimate was 1.00–1.6× the true gap. Still open, not approved:
   non-finite (±inf) duals are not rejected.
+
+## 2026-11-07 — Figures 1–3 generated (branch `figures`, not for main until author review)
+
+Directives as in the 2026-11-06 figure entry: generate to the author's
+specifications, work on the `figures` branch, nothing to `main` before the
+author's review.
+
+**Author decisions given in chat before generation:**
+- Figure 3 as specified, with 3 panels: vanilla unshifted, vanilla shifted,
+  log shifted.
+- In figure 2, "separation" means the spacing between curves for different
+  n.
+- Figure 4 axes: left against n, right against ε. Figure 4 is deferred
+  until the author can watch the Mac: plugged in, full battery, other
+  applications closed.
+- Figure 1 shows a second gap from the author's `lp_dual_bound`.
+- **Explicit approval** of presentation options A, B and C, after a
+  finding about the iteration cap:
+  - A: medians with capped runs counted as "at least the cap";
+  - B: fraction of runs converged;
+  - C: a second tolerance, 1e-6.
+  - D (20 seeds) is to be revisited once its runtime is known.
+
+**Files:**
+- Code: `experiments/_common.py` (paths, append-and-resume CSV, palette),
+  `fig1_cost_gap.py`, `fig2_iterations.py`, `fig3_stability.py`, and
+  `run_figures_1_3.sh`, which uses `.venv/bin/python`.
+- Outputs, in `figures/`: `fig1_cost_gap.{csv,png}` (180 runs),
+  `fig2_iterations.{csv,png}` (1,760 runs), `fig3_stability.{csv,png}`
+  (306 runs).
+- Each `run()` appends every run to the CSV as it finishes, and a rerun
+  skips runs already present. Each `plot()` reads only the CSV.
+
+**Choices I made where the spec left them open** (all constants at the top
+of each script):
+- Iteration cap 100,000 and tol 1e-9 everywhere, plus tol 1e-6 in figure 2.
+- Figure 1:
+  - n = 100, 5 seeds, ε from 1 to 0.01 (9 values), median-normalized,
+    gaussian separation 0;
+  - both solvers run; converged log runs plotted;
+  - a capped run has no valid gap, so option A doesn't apply; B does.
+- Figure 2:
+  - n ∈ {25, 50, 100, 200}, 5 seeds, ε from 1 to 0.003 (11 values);
+  - vanilla everywhere, log only where vanilla fails (iteration counts
+    are identical where both converge). In the event, vanilla never failed
+    on normalized C, so there are 0 log rows.
+- Figure 3: n = 50, seed 0 only, separations {0, 1, 2, 4, 8, 16}, ε from
+  0.003 to 30 raw (17 values).
+
+**Issues met:**
+- **Palette validator.** Node was missing; the author installed it with
+  Homebrew. Results:
+  - categorical pair (figure 1): all pass;
+  - ordinal blue ramp (figure 2): all pass;
+  - status colors (figure 3): the validator only knows categorical rules.
+    Amber fails the lightness band and warns on contrast (1.79:1). That is
+    by design in the reference palette; the hatching, text legend and
+    counts are the mitigation.
+- **Plot bugs fixed during generation:**
+  - titles took values from the script constants instead of the CSV;
+  - a stray placeholder function;
+  - the figure 3 legend overlapped the title;
+  - the figure 3 panel subtitles ran into each other;
+  - single-tolerance and single-n edge cases in figure 2.
+- **Figure 2 restarted** to add tol 1e-6. The 43 runs already done were
+  kept.
+- **Relaunch failure:** `python: command not found`, because the venv was
+  not active; fixed in the run script.
+- **The non-monotone probe was seed variance**, not an n effect. At
+  ε = 0.03 (median-normalized gaussian), iteration counts vary up to 100×
+  between seeds at the same n.
+- **The tolerance, not the cap, decides convergence.** The error falls to
+  about 1e-6 within a few hundred iterations, then crawls: on n = 25,
+  seed 1, 1.5e-7 at 10,000 iterations and 5.1e-8 at 1,000,000. Vanilla and
+  log give identical trajectories, so this is not a floating-point floor.
+
+**Runtimes** (single thread; on battery for part of the run, AC from
+00:26):
+- figure 3: about 9.5 min;
+- figure 1: about 8 min;
+- figure 2: about 7.5 min including the 1e-6 sweep.
+
+**Figure 2 separation check, median against max normalization:**
+
+| Family, tolerance | Median | Max |
+|---|---|---|
+| gaussian, 1e-9 | ratio 1.18; n-curves nearly coincide (decreasing with n at 3 of 6 ε, mixed at 3) | ratio 2.00; decreasing at 6 of 11 ε, mixed at 5 |
+| random, 1e-9 | ratio 4.50; decreasing at 8 of 9 ε | ratio 3.86; decreasing at 7 of 10 ε |
+
+The ratio is the median, over ε, of the largest to smallest iteration
+count across n. At 1e-6 the pattern is the same. So the separation holds
+for random cost but not for gaussian clouds.
+
+**Verification:** `ruff check .` passed; `pytest -q` 275 passed; all three
+PNGs inspected.
