@@ -66,9 +66,10 @@ def vanilla_sinkhorn(a, b, C, eps, *, stabilize="rowcol", tol=1e-9, max_iter=100
     err = np.inf       #Tracks final state of loop in each case
     n_iter = 0    #Tracks loop iteration count
     for i in range(max_iter):
-        multi = K @ v_s
-        #Tracks stopping criteria across loops
-        err = np.abs(u_s * multi - a_sub).sum() 
+        with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+            multi = K @ v_s
+            #Tracks stopping criteria across loops
+            err = np.abs(u_s * multi - a_sub).sum()
         #Stopping criteria
         if err < tol:
             status = "converged"
@@ -86,7 +87,8 @@ def vanilla_sinkhorn(a, b, C, eps, *, stabilize="rowcol", tol=1e-9, max_iter=100
         
 
     if status == "max_iter":
-        err = np.abs(u_s * (K @ v_s) - a_sub).sum()
+        with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+            err = np.abs(u_s * (K @ v_s) - a_sub).sum()
         if err < tol:    #last update converged but the loop ended before its check
             status = "converged"
             converge = True

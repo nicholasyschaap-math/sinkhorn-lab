@@ -487,8 +487,11 @@ reference.*
 - *Vanilla* reports `"numerical_failure"` when, after an update, any
   scaling in u or v is non-finite or exactly 0. A zero scaling means the
   kernel products have overflowed; a non-finite one means they underflowed
-  to 0 or became NaN. Floating-point warnings inside the loop are
-  suppressed: the status records the failure instead.
+  to 0 or became NaN. Floating-point warnings in the loop (the check, the
+  updates and the err recompute after the loop) are suppressed: the status
+  records the failure instead. Whether a matrix product warns on overflow
+  depends on the BLAS library: macOS did not warn, while Linux CI did, which
+  surfaced a gap fixed on 2026-11-06 (`AGENTS_LOG.md`).
 - *Log domain* reports `"numerical_failure"` only when a dual is
   non-finite. A dual equal to 0 is a valid value in the log domain.
 - *The zero check in vanilla flags failures one iteration earlier.* In a

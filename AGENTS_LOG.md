@@ -308,3 +308,32 @@ measurements, reasons for rejected alternatives, and test names.
     converging on the last allowed iteration counts as converged;
   - D11: failure detection, for reference;
   - D12: the test suite's approval.
+
+## 2026-11-06 — solvers.py: silence overflow warnings in vanilla's check (explicit author approval)
+
+**Explicit approval:** the author approved this fix, exactly as I presented
+it in chat. If CI still fails after this commit, the author will look at the
+code personally in IDLE to assess it.
+
+- Problem: CI on `e80069c` failed 3 of 275 tests on Python 3.12 and 3.13.
+  The warning was `src/sinkhorn_lab/solvers.py:69: RuntimeWarning: overflow
+  encountered in matmul` at `multi = K @ v_s`.
+  - After the check-before-update reorder, the vanilla check (the `K @ v_s`
+    product and the err line) sat outside the `errstate` block.
+  - Linux's matrix library warns when that product overflows; macOS's does
+    not, so every local run passed. I had earlier told the author those
+    lines did not warn in practice, which I had checked only on macOS.
+  - Results were unaffected (`numerical_failure` was still reported). The
+    tests failed only because they treat warnings as errors. The tests
+    were not changed.
+- Edit, in `vanilla_sinkhorn` only:
+  - the in-loop `multi = K @ v_s` and `err = ...` lines are wrapped in
+    `np.errstate(divide="ignore", invalid="ignore", over="ignore")`;
+  - the post-loop err recompute is wrapped in the same `errstate`.
+  The Edit tool also removed a trailing space on the in-loop err line.
+  `log_sinkhorn` is unchanged.
+- DECISIONS.md D11: corrected the statement about warnings being
+  suppressed, and noted that the warning depends on the platform's matrix
+  library.
+- Local: `ruff check` passed on `solvers.py` and `tests/`; `pytest -q` 275
+  passed. Linux CI result: see the commit after `e80069c`.
