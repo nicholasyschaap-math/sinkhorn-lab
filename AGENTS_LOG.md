@@ -482,3 +482,11 @@ for random cost but not for gaussian clouds.
 
 **Verification:** `ruff check .` passed; `pytest -q` 275 passed; all three
 PNGs inspected.
+
+## 2026-11-07 — .gitignore: .figlogs/; figures branch merged to main (author approval)
+
+- `.gitignore`: added `.figlogs/` (local figure run logs), at the author's
+  request.
+- The author approved committing the branch to `main` if I saw no further
+  issues. I found none: `ruff check .` passed and `pytest -q` passed before
+  the merge. Fast-forward merge of `figures` into `main`.
