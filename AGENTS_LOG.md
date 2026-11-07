@@ -337,3 +337,53 @@ code personally in IDLE to assess it.
   library.
 - Local: `ruff check` passed on `solvers.py` and `tests/`; `pytest -q` 275
   passed. Linux CI result: see the commit after `e80069c`.
+
+## 2026-11-06 — Figure generation handed to the agent (branch `figures`)
+
+**Explicit directives from the author:**
+- Generate the four figures from the author's specifications in
+  `implementation.md` and `DECISIONS.md` (D4), which the author has
+  personally reviewed.
+- Work on a separate branch, `figures`.
+- Write the figure PNGs (and CSVs) to `figures/`, a different folder from
+  the generation code in `experiments/`.
+- Report issues met during generation to the author in the terminal.
+- Refuse to generate, and ask, if an important point is ambiguous.
+- Nothing is committed to `main` until the author has reviewed it.
+
+Before generating, I asked the author to settle open points (see the next
+entry).
+
+## 2026-11-07 — metrics.py committed; lp_dual_bound reduced to the support (explicit author approval)
+
+`metrics.py` is author-owned. It is committed on the `figures` branch at
+the author's direction, not on `main`; the author will check the code.
+
+- Author's note: `metrics.py` may receive further updates for new features
+  later. For clarity of the equations, the author coded much of the
+  intended mathematical content directly in `solvers.py`, rather than
+  splitting it across files and making it harder for a reader to see where
+  each derivation is used.
+- The author fixed the ruff I001 blank-line issue themselves; ruff now
+  passes on `src/`.
+- **Explicit approval:** the author approved me adding the support
+  reduction to `lp_dual_bound`, modelled on their support handling in
+  `solvers.py`.
+  - Before this, D1 output (NaN duals off the support) made the function
+    raise.
+  - Added: the negative-weight checks and the empty-support check (same
+    messages as the solvers); `rows = a > 0`, `cols = b > 0`; f, a, g, b
+    and C restricted with `np.ix_`. The NaN check now applies to the
+    support only. Nothing else changed.
+- Verification: on gaussian_clouds 12×10 with zeros at a[0, 5] and
+  b[3, 9], at ε = 1 and 0.1, for both solvers:
+  - the bound equals the bound computed on the reduced problem, to 12
+    digits;
+  - the bound is ≤ the LP optimum (1.6047 and 1.6354 against 1.6523);
+  - exact duals give bound − LP = −1.3e-15;
+  - with no zero weights the value is unchanged;
+  - negative or all-zero weights raise ValueError.
+- Earlier review (no change made): `lp_dual_bound` is a valid weak-duality
+  bound. Over 20 runs on 4 problems the bound never exceeded the LP. Its
+  overpay estimate was 1.00–1.6× the true gap. Still open, not approved:
+  non-finite (±inf) duals are not rejected.
