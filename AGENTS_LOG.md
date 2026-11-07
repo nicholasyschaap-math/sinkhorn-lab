@@ -173,3 +173,138 @@ Verification before commit:
   the true row error of the returned P in both solvers (96.04, 1.4307);
   vanilla and log agree at ε = 0.5 (89 iterations each, plans within
   2.4e-17); vanilla at ε = 0.01 returns `numerical_failure`.
+
+## 2026-11-06 — solvers.py: converged on the last allowed iteration (explicit author approval)
+
+**Explicit approval:** the author approved this edit to the author-owned
+`solvers.py` in chat and asked for it to go in this push. No other edit was
+made to the file apart from the one in the next entry.
+
+- `vanilla_sinkhorn` and `log_sinkhorn`: after the err recompute that runs
+  after the loop when `status == "max_iter"`, if `err < tol` then
+  `status = "converged"` and `converge = True`. Three lines in each
+  function.
+- Side effect: the Edit tool also removed trailing spaces at the end of the
+  `err = ...` line it touched in each function. The code is unchanged.
+- Reason: with the check-before-update loop, a run converging on update n
+  reported `"max_iter"` with `err < tol` when `max_iter = n`.
+- Verified on the clouds_sep2 test problem at ε = 1 (converges in 41
+  iterations):
+  - `max_iter` = 40 gives `max_iter` with err 1.51e-9;
+  - `max_iter` = 41 gives `converged` with `n_iter` 41 and err 9.10e-10;
+  - `max_iter` = 42 gives the same result as 41.
+  Both solvers behave identically.
+
+## 2026-11-06 — solvers.py: default max_iter 100,000 (explicit author approval)
+
+**Explicit approval:** the author approved this edit to the author-owned
+`solvers.py` in chat.
+
+- Both signatures: `max_iter=10_000` became `max_iter=100_000`.
+- Reason (author): a wider range of starting parameters gives richer data
+  for the figures. Noted in DECISIONS.md D10: a run that never converges
+  now takes about 40 minutes for the log solver at n = 1000, so experiment
+  scripts should set `max_iter` explicitly.
+
+## 2026-11-06 — Solver tests: tests/test_solvers.py, tests/test_log_solver.py
+
+The author reviewed and approved the tests for accuracy and scope, on
+condition that a very large n test was added.
+
+- `tests/test_solvers.py` runs both solvers on every test, unless marked
+  "vanilla". The LP references don't use POT (`linear_sum_assignment`,
+  HiGHS `linprog`), and every test treats a warning as a failure. It covers:
+  - `rowcol_shift`;
+  - converged-run properties: status, `err` equal to the true row error,
+    row error < 1e-8, column error < 1e-12, P finite and ≥ 0,
+    cost = ⟨P, C⟩;
+  - the Gibbs form of the reported duals on the original C;
+  - cost ≥ LP minus the slack the marginal error allows;
+  - the gap to the LP shrinking at every step of ε = 1 → 0.03;
+  - P → abᵀ at ε = 1e5, and the single-source case;
+  - invariance to row and column offsets, and to scaling C and ε together;
+  - `none` and `rowcol` agreeing;
+  - D1 matching the reduced problem;
+  - capped runs (0, 1, 3, 50) reporting the true error;
+  - converging on the last allowed iteration;
+  - tighter `tol` taking more iterations;
+  - determinism and inputs never modified;
+  - 9 kinds of bad input;
+  - vanilla failure detection, unshifted and shifted;
+  - large n (2000 × 2000, median-normalized, ε = 1): converged-run
+    properties against the `linear_sum_assignment` LP, and agreement
+    between the two solvers.
+- `tests/test_log_solver.py` covers:
+  - `softmin`: the direct formula, where the direct formula underflows, and
+    the hard-min limit;
+  - `slack`, entry by entry;
+  - agreement with vanilla (n_iter, P, f + g, cost) on 4 problems with
+    both stabilize options, and on capped runs;
+  - converging where vanilla underflows without the shift;
+  - staying finite and improving where vanilla fails with the shift;
+  - no `numerical_failure` at ε = 1e-4 and 1e-8.
+- A problem with non-uniform weights (Dirichlet) was added after the first
+  round of deliberate breaks: the generators only make uniform weights,
+  and a g update using mean(b) was caught by only 1 test.
+
+Mutations, applied to scratch copies of `src/` (the real file was never
+mutated), with the number of tests each one failed:
+
+| Mutation | Tests failed |
+|---|---|
+| sign of K flipped | 29 |
+| α dropped from f | 13 |
+| α added twice | 13 |
+| stop check on the column marginal | 30 |
+| no post-loop err recompute (vanilla) | 7 |
+| `n_iter` counting the check | 22 |
+| `softmin` sign flipped | 42 |
+| sign flipped inside the stop check's `exp` (log) | 29 |
+| g missing from the log plan | 37 |
+| β dropped (log) | 13 |
+| no post-loop err recompute (log) | 9 |
+| β not subtracted in `rowcol_shift` | 23 |
+| off-support duals set to 0 | 4 |
+| cost computed on a shifted C | 20 |
+| `stabilize` check removed | 4 |
+| negative-`a` check removed | 2 |
+| g update using mean(b) (log), after adding the non-uniform problem | 4 |
+| f update using mean(a) (log), after adding the non-uniform problem | 4 |
+| v update using mean(b) (vanilla), after adding the non-uniform problem | 4 |
+
+For the new tests specifically:
+- removing the at-cap fix fails the at-cap test for both solvers;
+- the sign flip of K fails 2 of the large-n tests;
+- dropping β fails 1 of the large-n tests;
+- f update using mean(a) passes the large-n tests, because their weights
+  are uniform. The non-uniform tests catch it.
+
+The vanilla zero check (`u_s == 0` or `v_s == 0`) has no test. Removing it
+only delays the failure flag by one iteration (480-run sweep, 61 runs
+affected, same status in all). See DECISIONS.md D11.
+
+Result: `pytest -q` 275 passed in 7.2 s; `ruff check` passes on everything
+except the author's uncommitted `metrics.py`.
+
+## 2026-11-06 — DECISIONS.md: D5–D12, D4 figure note, D1 status
+
+The author asked me to paraphrase their descriptions and format them as
+markdown. The author will review the text by hand after upload. Where the
+author's descriptions were brief, I added context from earlier sessions:
+measurements, reasons for rejected alternatives, and test names.
+
+- D1: "will implement" became "implements", with the test name.
+- D4: the four-figure set reduces redundancy across axes; the planned ratio
+  figure is dropped in favour of spread and iteration-count data.
+- New sections:
+  - D5: separate vanilla and log functions; a hybrid solver is deferred
+    until there is data;
+  - D6: the `SinkhornResult` fields and the scope of what is reported;
+  - D7: vanilla as derived; check-before-update loop order, with the timing
+    numbers and why checking at intervals was rejected;
+  - D8: the `softmin` and `slack` helpers;
+  - D9: input guards, with an open point on unequal mass and non-finite C;
+  - D10: default `max_iter` of 100,000; `err` reports the returned plan;
+    converging on the last allowed iteration counts as converged;
+  - D11: failure detection, for reference;
+  - D12: the test suite's approval.

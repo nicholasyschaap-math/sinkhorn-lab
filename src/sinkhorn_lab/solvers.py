@@ -33,7 +33,7 @@ def slack(C, f, g):
     S = C - f[:,None] - g
     return S
 
-def vanilla_sinkhorn(a, b, C, eps, *, stabilize="rowcol", tol=1e-9, max_iter=10_000):
+def vanilla_sinkhorn(a, b, C, eps, *, stabilize="rowcol", tol=1e-9, max_iter=100_000):
     if not eps > 0:
         raise ValueError("Invalid Regularization")
     if stabilize not in ("none", "rowcol"):
@@ -86,7 +86,10 @@ def vanilla_sinkhorn(a, b, C, eps, *, stabilize="rowcol", tol=1e-9, max_iter=10_
         
 
     if status == "max_iter":
-        err = np.abs(u_s * (K @ v_s) - a_sub).sum()    
+        err = np.abs(u_s * (K @ v_s) - a_sub).sum()
+        if err < tol:    #last update converged but the loop ended before its check
+            status = "converged"
+            converge = True
     with np.errstate(divide="ignore", invalid="ignore"):    #Same motivation as earlier instance of this context
         P_sub = u_s[:, None] * K * v_s[None,:]
         f_sub = eps * np.log(u_s) + alpha          # duals in log form 
@@ -104,7 +107,7 @@ def vanilla_sinkhorn(a, b, C, eps, *, stabilize="rowcol", tol=1e-9, max_iter=10_
     return results
 
 
-def log_sinkhorn(a, b, C, eps, *, stabilize="rowcol", tol=1e-9, max_iter=10_000):
+def log_sinkhorn(a, b, C, eps, *, stabilize="rowcol", tol=1e-9, max_iter=100_000):
     if not eps > 0:
         raise ValueError("Invalid Regularization")
     if stabilize not in ("none", "rowcol"):
@@ -156,7 +159,10 @@ def log_sinkhorn(a, b, C, eps, *, stabilize="rowcol", tol=1e-9, max_iter=10_000)
         
 
     if status == "max_iter":
-        err = np.abs(np.exp(-softmin(slack(Cs, f_s, g_s), eps, 1) / eps) - a_sub).sum()    
+        err = np.abs(np.exp(-softmin(slack(Cs, f_s, g_s), eps, 1) / eps) - a_sub).sum()
+        if err < tol:    #last update converged but the loop ended before its check
+            status = "converged"
+            converge = True
     with np.errstate(divide="ignore", invalid="ignore"):    #Same motivation as earlier instance of this context
         P_sub = np.exp((f_s[:, None] + g_s[None,:] - Cs) / eps)
         f_sub = f_s + alpha          # duals in log form 

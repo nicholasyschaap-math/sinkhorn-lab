@@ -58,7 +58,9 @@ duals of zero-weight points as NaN.
   and returns NaN duals off the support. POT's own `ot.emd` would instead
   fill those duals with estimated finite values. *(Confirmed by the author,
   2026-11-06.)*
-- `solvers.py` (author) will implement it for both Sinkhorn variants.
+- `solvers.py` (author) implements it in both `vanilla_sinkhorn` and
+  `log_sinkhorn`. Tested in `tests/test_solvers.py`
+  (`test_zero_weights_match_reduced_problem`).
 
 ---
 
@@ -198,7 +200,10 @@ did not corrupt it. Otherwise it raises `ExactSolverError`.
 *Status: decided by the author, 2026-11-06.*
 
 **Figures.** There are four figures (this supersedes the three-figure plan in
-`implementation.md`):
+`implementation.md`). The set was chosen to reduce redundancy across axes:
+the originally planned ratio figure is dropped, and its place goes to data
+on the effect of spread (separation, figure 3) and on iteration count
+(figure 2). *(Author, 2026-11-06.)*
 
 1. **Cost gap.**
 2. **Iterations.**
@@ -251,3 +256,259 @@ C̃_max ≤ 1, so the predictor is at most 1/ε.
   D2 shift internally may show much weaker dependence on separation than
   the raw range suggests. That may be the intended finding, or it may call
   for plotting against C̃_max/ε or a different axis. The author decides.
+
+---
+
+## D5. Vanilla and log-domain Sinkhorn are separate functions
+
+*Status: decided by the author, 2026-11-06.*
+
+**Decision.** The scaling-form solver (`vanilla_sinkhorn`) and the
+log-domain solver (`log_sinkhorn`) are separate functions with the same
+signature, `(a, b, C, eps, *, stabilize="rowcol", tol=1e-9, max_iter=100_000)`,
+and the same return type (D6). Neither switches to the other internally.
+
+**Reasoning.**
+
+- *Comparison needs clean separation.* The project measures where each
+  method stops being reliable and what the log domain costs where vanilla
+  fails (figures 2–4). A solver that switched methods partway through a run
+  would blur both measurements.
+- *A combined solver is deferred, not rejected.* A transitional (hybrid)
+  solver can be built later. Designing it after the experiments means its
+  switching rule can be based on data about where each method loses
+  stability, rather than on a guess.
+
+**Consequences.** Both functions share the input guards (D9), the D1
+support handling, the D2 shift and the stopping rule (D7), so their
+iteration counts are directly comparable. On problems where vanilla
+converges, the two return the same status, the same `n_iter` and plans
+equal to rounding (`tests/test_log_solver.py`).
+
+---
+
+## D6. One result class for both solvers
+
+*Status: decided by the author, 2026-11-06.*
+
+**Decision.** Both solvers return a frozen dataclass, `SinkhornResult`, with
+these fields:
+
+| Field | Meaning |
+|---|---|
+| `P` | Transport plan, shape (n, m), on the full index set (zero rows and columns off the support, D1). |
+| `f`, `g` | Dual potentials on the original C (D2: f + α, g + β); NaN off the support (D1). |
+| `cost` | Transport cost ⟨P, C⟩ on the original C. |
+| `converged` | `True` exactly when `status == "converged"`. |
+| `n_iter` | Number of completed update sweeps (one f/u update followed by one g/v update). |
+| `status` | `"converged"`, `"max_iter"` or `"numerical_failure"`. |
+| `err` | Row-marginal error ‖P1 − a‖₁ of the returned P (D10). NaN on `"numerical_failure"`. |
+
+**Reasoning.**
+
+- *One structure for every consumer.* Experiment scripts write one CSV row
+  per run (`implementation.md`, experiment conventions). A shared result
+  type means the figure scripts read the same fields from either solver.
+- *Readable tests.* Tests check named fields, such as `r.status` and
+  `r.err`, and the same test can run on both solvers by parametrization.
+- *Scope.* Other quantities, such as the regularized (entropic) objective
+  or Sinkhorn divergences, are outside the properties this project
+  investigates and are not reported. They can be computed from `P`, `f`,
+  `g` and `C` if needed later.
+
+---
+
+## D7. Vanilla follows the derivation; the stopping check comes before each update
+
+*Status: decided by the author, 2026-11-06. The loop order was changed
+after the log-domain solver was written.*
+
+**Decision.**
+
+- *Vanilla.* `vanilla_sinkhorn` is a standard implementation of the
+  scaling iteration from the author's derivations
+  (`docs/derivation.md`). The kernel is K̃ = exp(−C̃/ε) on the D2-shifted
+  cost, the scalings start at u = v = 1, and each sweep sets
+  u ← a / (K̃v), then v ← b / (K̃ᵀu).
+- *Stopping rule.* Stop when the row-marginal error ‖diag(u) K̃ v − a‖₁ is
+  below `tol`. Right after the v update the column marginal is exact up to
+  rounding, so only the row marginal carries information.
+- *Loop order.* Each pass computes the stopping check *before* the update,
+  from quantities the update then reuses:
+  - vanilla computes `K̃v` once, uses it for the check, then sets
+    u = a / (K̃v);
+  - the log solver computes the row soft-min of the slack once, uses it for
+    the check (D8), then for the f update.
+
+**Reasoning for the order.** The original order, update then check,
+recomputed a matrix product or a full n×m slack matrix every iteration only
+to measure the error.
+
+- *Measured cost of the separate check.* For the log solver it was about
+  11–20% of an iteration (n = 50 to 1000). The reused check costs one
+  exponential over n entries, a few microseconds. For vanilla the separate
+  check was 42–74% of an iteration. After the change a vanilla iteration
+  at n = 400 went from 45 to 34 µs.
+- *Checking at intervals was considered and rejected.* Checking every k
+  iterations would save at most the cost of the check, which the reorder
+  makes nearly zero anyway. It would also overshoot convergence by up to
+  k − 1 full iterations, and it would round `n_iter` to multiples of k,
+  which distorts figure 2. The iterations needed at a fixed ε vary too
+  widely between problems (62 to over 10,000 at ε = 0.03 on the test
+  problems) for any schedule tied to ε.
+- *Nothing else changes.* The check measures the same quantity as before,
+  so iteration counts and plans are unchanged.
+
+**Consequences.** Because the check now runs before the update, the last
+update of a run is checked after the loop ends (D10).
+
+---
+
+## D8. The log-domain solver is written with `softmin` and `slack` helpers
+
+*Status: decided by the author, 2026-11-06.*
+
+**Decision.** `log_sinkhorn` is written in terms of two helpers in
+`solvers.py`:
+
+- `softmin(A, eps, axis)` = −ε log Σ exp(−A/ε) along `axis`, computed with
+  `scipy.special.logsumexp`. `axis=1` reduces over each row, `axis=0` over
+  each column.
+- `slack(C, f, g)` = C − f 1ᵀ − 1 gᵀ, entry by entry Cᵢⱼ − fᵢ − gⱼ.
+
+With S = slack(C̃, f, g), each sweep is
+
+  f ← f + ε log a + softmin(S, ε, rows),  then recompute S,
+  g ← g + ε log b + softmin(S, ε, columns),
+
+and the plan is P = exp(−S/ε), that is exp((f + g − C̃)/ε). Duals start at
+f = g = 0, the log-domain counterpart of u = v = 1. The stopping check uses
+the row sums of P, which are exp(−softmin(S, ε, rows)/ε), the same soft-min
+the f update needs.
+
+**Reasoning.**
+
+- *The code reads like the derivation.* Writing the updates in terms of
+  soft-min and slack makes them resemble the derived formulas closely,
+  which makes them easier to check against `docs/derivation.md` and easier
+  to read.
+- *Stability.* The kernel K̃ is never formed. Every exponential goes through
+  `logsumexp`, which subtracts the maximum first. So the iteration stays
+  finite where vanilla underflows or overflows: in the tests, at ε = 1e-8 it still
+  returns finite duals and plans and never reports `"numerical_failure"`.
+  Slow convergence remains; the log domain fixes range, not rate.
+- *Testable pieces.* The helpers are tested on their own: `softmin`
+  against the direct formula, where the direct formula underflows, and in
+  the hard-min limit; `slack` entry by entry.
+
+---
+
+## D9. Input guards at the top of each solver
+
+*Status: decided by the author, 2026-11-06, partway through writing the
+solvers.*
+
+**Decision.** Before any computation, each solver raises `ValueError` when:
+
+- ε is not strictly positive. The test `not eps > 0` also rejects NaN.
+- `stabilize` is not `"none"` or `"rowcol"`.
+- any entry of `a` or of `b` is negative;
+- `a` or `b` has no positive entry, so the support (D1) is empty.
+
+**Reasoning.**
+
+- *Invalid inputs should fail loudly rather than return output that looks
+  plausible.* A negative weight or a non-positive ε would otherwise produce
+  numbers that look like a result.
+- *Typos must not change the experiment.* If an unknown `stabilize` value
+  quietly fell back to the default, a run meant to use one mode would use
+  another and the figure would be mislabelled. Raising makes that
+  impossible.
+
+**Open.** The solvers do not yet check that the total masses of `a` and
+`b` are equal, or that C is finite. Problems from the generators are
+already validated (`problems._validate`), so this matters only for
+hand-built inputs. With unequal masses the iteration oscillates until
+`max_iter`; a NaN in C ends as a numerical failure. Calling
+`problems._validate` at the top of each solver would cover both. Left to
+the author.
+
+---
+
+## D10. Iteration cap and what `err` reports
+
+*Status: decided by the author, 2026-11-06.*
+
+**Decision.**
+
+- *Default cap.* `max_iter` defaults to 100,000 in both solvers, up from
+  10,000, so that a wider range of starting parameters, especially small
+  ε, can converge and give richer data for the figures.
+- *`err` always describes the returned plan.* `err` is the row-marginal
+  error of the `P` that is returned, whatever the status, except on
+  `"numerical_failure"`, where it is NaN. When a run hits the cap, `err` is
+  recomputed after the loop from the final state. With `max_iter = 0` it is
+  therefore the error of the starting plan, not `inf`.
+- *Converging on the last allowed iteration counts as converged.* If the
+  error recomputed after the loop is below `tol`, the run reports
+  `"converged"`.
+
+**Reasoning.**
+
+- *The earlier behaviour was less informative.* Because the check runs
+  before each update (D7), the final update of a capped run used to go
+  unchecked. `err` then described the plan one update earlier, or was
+  `inf` when no update ran. Figures 2 and 3 record the final error of every
+  run, including capped ones, so `err` must match the plan that was
+  returned.
+- *Status must not depend on where the cap falls.* Without the last rule, a
+  run that needs exactly n updates would report `"max_iter"` with
+  `err < tol` when `max_iter = n`, and `"converged"` when `max_iter = n + 1`.
+
+**Consequences.**
+
+- *Capped runs can be slow.* At the new default, a run that never converges
+  costs 100,000 iterations. A log-domain iteration at n = 1000 takes about
+  23 ms, so such a run takes roughly 40 minutes. Experiment scripts should
+  set `max_iter` explicitly for each figure. As before, a capped run's
+  iteration count is the cap, not a measurement (`implementation.md`,
+  plotting traps).
+- *Tested.* `test_capped_run_reports_error_of_returned_plan` and
+  `test_converging_on_the_last_allowed_iteration_reports_converged`, for
+  both solvers.
+
+---
+
+## D11. Failure detection
+
+*Status: implemented by the author, 2026-11-06; recorded here for
+reference.*
+
+- *Vanilla* reports `"numerical_failure"` when, after an update, any
+  scaling in u or v is non-finite or exactly 0. A zero scaling means the
+  kernel products have overflowed; a non-finite one means they underflowed
+  to 0 or became NaN. Floating-point warnings inside the loop are
+  suppressed: the status records the failure instead.
+- *Log domain* reports `"numerical_failure"` only when a dual is
+  non-finite. A dual equal to 0 is a valid value in the log domain.
+- *The zero check in vanilla flags failures one iteration earlier.* In a
+  480-run sweep, it was the deciding condition in 61 runs. In every one of
+  them the non-finite check caught the same failure one iteration later,
+  with the same status. It changes when failure is reported, not whether.
+- *What is reported on failure.* `P`, `f`, `g` and `cost` come from the
+  final, non-finite state and are not meaningful. Filter on `status` before
+  using them (`implementation.md`, plotting traps).
+
+---
+
+## D12. Solver test suite
+
+*Status: reviewed and approved by the author for accuracy and scope,
+2026-11-06, on condition that a very large n test was added; it was
+(n = 2000).*
+
+`tests/test_solvers.py` runs shared properties on both solvers, and
+`tests/test_log_solver.py` covers log-specific behaviour. The LP references
+are independent of POT. Every solver test treats a warning as a failure.
+The properties covered are listed in `AGENTS_LOG.md`, together with the
+deliberate code breaks used to check that the tests detect errors.
