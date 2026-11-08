@@ -367,9 +367,6 @@ domain is required.
 - The plan needs no rescaling: $`P = \mathrm{diag}(u')\, K' \,\mathrm{diag}(v')`$.
 - The potentials are recovered in log form:
   $f = \varepsilon \log u' + \alpha$ and $g = \varepsilon \log v' + \beta$.
-- Do not form $u = u' \odot e^{\alpha/\varepsilon}$ in floating point.
-  $e^{\alpha_i/\varepsilon}$ overflows once $\alpha_i/\varepsilon$ exceeds
-  about 709, which is exactly the regime where the shift matters.
 - Compute the transport cost as $\langle P, C \rangle$ with the original $C$.
   The identity
   $`\langle P, C \rangle = \langle P, C' \rangle + \langle \alpha, P\mathbf{1}_m \rangle + \langle \beta, P^\top\mathbf{1}_n \rangle`$
@@ -391,8 +388,7 @@ domain is required.
 Checked against the current arXiv version of Peyré and Cuturi.
 
 - **Eqs. (4.39) and (4.41)** use $f^{(\ell)}$ in the $g$ update. Follow
-  eqs. (4.36) and (4.44), which use $f^{(\ell+1)}$. Section 4 shows the
-  simultaneous version failing to converge.
+  eqs. (4.36) and (4.44), which use $f^{(\ell+1)}$.
 
 ## References
 
