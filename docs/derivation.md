@@ -110,9 +110,9 @@ $$
 With $u_i = e^{f_i/\varepsilon}$, $K_{ij} = e^{-C_{ij}/\varepsilon}$ and
 $v_j = e^{g_j/\varepsilon}$, this is the scaling form
 
-$$
+```math
 P_{ij} = u_i K_{ij} v_j, \qquad P = \operatorname{diag}(u)\, K \operatorname{diag}(v).
-$$
+```
 
 **Why no multiplier for $P \ge 0$ is needed.** The derivative of
 $\varepsilon P_{ij}(\log P_{ij} - 1)$ tends to $-\infty$ as $P_{ij} \to 0^+$,
@@ -239,15 +239,15 @@ $$
 \operatorname{min}_\varepsilon(z) = -\varepsilon \log \sum_k e^{-z_k/\varepsilon}.
 $$
 
-It satisfies $\operatorname{min}_\varepsilon(z + c) = \operatorname{min}_\varepsilon(z) + c$
+It satisfies $`\operatorname{min}_\varepsilon(z + c) = \operatorname{min}_\varepsilon(z) + c`$
 for any constant $c$. With $c = -\underline{z}$, where
 $\underline{z} = \min_k z_k$, this gives the evaluation used in practice
 (eq. (4.42)):
 
-$$
+```math
 \operatorname{min}_\varepsilon(z) = \underline{z}
 - \varepsilon \log \sum_k e^{-(z_k - \underline{z})/\varepsilon}.
-$$
+```
 
 The largest term in the sum is $e^0 = 1$, so the sum is at least 1 and
 neither underflows to 0 nor overflows. This is what makes the log domain
@@ -262,19 +262,19 @@ $$
 Since $C_{ij} - g_j = S_{ij} + f_i$, the translation property gives the form
 written with the slack:
 
-$$
+```math
 f_i^{(\ell+1)} = f_i^{(\ell)}
 + \operatorname{min}_\varepsilon\Big(S\big(f^{(\ell)}, g^{(\ell)}\big)_{ij}\Big)_j
 + \varepsilon \log a_i.
-$$
+```
 
 Likewise, with the slack evaluated at the **updated** $f^{(\ell+1)}$:
 
-$$
+```math
 g_j^{(\ell+1)} = g_j^{(\ell)}
 + \operatorname{min}_\varepsilon\Big(S\big(f^{(\ell+1)}, g^{(\ell)}\big)_{ij}\Big)_i
 + \varepsilon \log b_j.
-$$
+```
 
 These are eqs. (4.43)–(4.44). Using $f^{(\ell)}$ in the $g$ update instead
 turns the method into a simultaneous update, which is not block coordinate
@@ -285,7 +285,7 @@ alternating version converged to machine precision.
 **Interpretation.** The plan defined by a pair of potentials is
 $P(f,g)_{ij} = e^{-S(f,g)_{ij}/\varepsilon}$. A soft-min over a row of $S$ is
 therefore
-$\operatorname{min}_\varepsilon\big(S_{i\cdot}\big) = -\varepsilon \log p_i$,
+$`\operatorname{min}_\varepsilon\big(S_{i\cdot}\big) = -\varepsilon \log p_i`$,
 where $p_i = \big(P(f^{(\ell)}, g^{(\ell)})\mathbf{1}_m\big)_i$ is the current
 row sum. Writing $q_j$ for the column sums of $P(f^{(\ell+1)}, g^{(\ell)})$,
 the updates become
@@ -333,9 +333,9 @@ feasible $P$, so the minimizer is unchanged.
 **Scalings.** The shifted kernel is
 $K'_{ij} = e^{-(C_{ij} - \alpha_i - \beta_j)/\varepsilon}$, so
 
-$$
+```math
 K' = \operatorname{diag}\big(e^{\alpha/\varepsilon}\big)\, K \,\operatorname{diag}\big(e^{\beta/\varepsilon}\big).
-$$
+```
 
 With shifted potentials $f' = f - \alpha$ and $g' = g - \beta$,
 
@@ -346,9 +346,9 @@ $$
 
 and the plan is the same in both coordinates:
 
-$$
+```math
 P = \operatorname{diag}(u')\, K' \operatorname{diag}(v') = \operatorname{diag}(u)\, K \operatorname{diag}(v).
-$$
+```
 
 **Only floating-point behavior changes.** Running the iteration of Section 2 on
 $K'$ from $v'^{(0)} = \mathbf{1}_m$ produces exactly the iterates of the
