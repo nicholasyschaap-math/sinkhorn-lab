@@ -547,3 +547,31 @@ The last two leave a valid bound, so they are not correctness bugs:
   though Sinkhorn hit the cap.
 
 **Verification:** `ruff check .` passed; `pytest -q` 313 passed.
+
+## 2026-11-08 — implementation.md brought up to date for the v0.1.0 release
+
+At the author's request, `implementation.md` was rewritten to describe the
+project as built, ahead of tagging `v0.1.0`.
+
+**Plan changes are the author's.** The original stage plan was adjusted by
+the author while writing `solvers.py` by hand. The reasons are recorded in
+`DECISIONS.md` (D4 for the figure set, D5–D11 for the solver design);
+`implementation.md` now points there and defers to it.
+
+**Changes to `implementation.md`:**
+- new Status section: released as `v0.1.0` with figures 1–3; figure 4
+  (timing) follows after publication;
+- the stage table gains a status column. Stage 3's `failure_sweep.py` and
+  stage 4's `compare_solvers.py` and `test_independent.py` are marked as not
+  built, with where that work lives instead (figure 3; figures 1–3;
+  the POT-independent references in `test_solvers.py` and `test_exact.py`);
+- the solver contract replaces the `?` placeholders with the built
+  signature, `SinkhornResult` fields (adds `f`, `g`, `cost`), the stopping
+  rule and `stabilize`, and summarizes D5–D11;
+- a `metrics.py` entry for `lp_dual_bound`;
+- the timing-experiment section is marked pending.
+
+**Also:** `pyproject.toml` version 0.0.0 → 0.1.0, to match the tag.
+
+**Verification:** no code changed. `ruff check .` and `pytest -q` were run
+before the release commit (results in the session report).

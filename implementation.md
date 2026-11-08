@@ -17,17 +17,28 @@ Agents may write everything else when asked: generators, the exact baseline,
 tests, experiment scripts, CI, and the clean-clone check. If a task seems to
 need a change to an author-owned file, stop and describe the change instead.
 
+## Status
+
+Released as `v0.1.0` with figures 1–3. Figure 4 (timing) is the next
+addition and will be committed after publication.
+
+**Plan changes.** The original stage plan was adjusted by the author while
+writing the solvers by hand. The reasons are recorded in `DECISIONS.md`:
+D4 for the figure set, D5–D11 for the solver design. This file now
+describes the project as built. Where it and `DECISIONS.md` disagree,
+`DECISIONS.md` wins.
+
 ## Layout by stage
 
-| Stage | Code | Tests | Output |
-| --- | --- | --- | --- |
-| Setup | `pyproject.toml`, `src/sinkhorn_lab/__init__.py`, `.github/workflows/ci.yml` | `tests/test_smoke.py` | |
-| 1. Baseline | `problems.py`, `exact.py` | `test_problems.py`, `test_exact.py` | |
-| 2. Vanilla | `solvers.py`, `metrics.py` (author) | `test_solvers.py`, `test_metrics.py` | |
-| 3. Failure hunt | `experiments/failure_sweep.py` | Failing instance added to `test_solvers.py` | `figures/failure_sweep.csv` |
-| 4. Log domain | `solvers.py` (author), `experiments/compare_solvers.py` | `test_log_solver.py`, `test_independent.py` | |
-| 5. Experiments | `experiments/fig1_cost_gap.py`, `fig2_iterations.py`, `fig3_stability.py`, `fig4_timing.py` | None | `figures/*.csv`, `figures/*.png` |
-| 6. Release | None | Clean-clone run | `README.md`, `v0.1.0` tag |
+| Stage | Code | Tests | Output | Status |
+| --- | --- | --- | --- | --- |
+| Setup | `pyproject.toml`, `src/sinkhorn_lab/__init__.py`, `.github/workflows/ci.yml` | `tests/test_smoke.py` | | Done |
+| 1. Baseline | `problems.py`, `exact.py` | `test_problems.py`, `test_exact.py` | | Done |
+| 2. Vanilla | `solvers.py`, `metrics.py` (author) | `test_solvers.py`, `test_metrics.py` | | Done |
+| 3. Failure hunt | None | | | Not built as a separate sweep. Failure regions are mapped by figure 3 (D4). |
+| 4. Log domain | `solvers.py` (author) | `test_log_solver.py` | | Done. The planned `compare_solvers.py` and `test_independent.py` were not built: figures 1–3 compare the solvers, and the POT-independent LP references are in `test_solvers.py` and `test_exact.py`. |
+| 5. Experiments | `experiments/_common.py`, `fig1_cost_gap.py`, `fig2_iterations.py`, `fig3_stability.py`, `run_figures_1_3.sh` | None | `figures/fig{1,2,3}_*.csv`, `.png` | Figures 1–3 done. `fig4_timing.py` is pending (below). |
+| 6. Release | None | CI on a fresh checkout | `README.md`, `v0.1.0` tag | Done |
 
 All `src` files are in `src/sinkhorn_lab/`. Install with `pip install -e ".[dev]"`.
 
@@ -68,26 +79,46 @@ class Problem:
   more than `tol`. It never returns an unverified answer.
 - This is the only file that imports `ot`.
 
-### Solvers (author fills this in after stage 2)
+### Solvers
 
-Tests and experiments depend on this contract. Read it from here, not from
-the solver body.
+Tests and experiments depend on this contract. Read it from here and from
+`DECISIONS.md`, not from the solver body.
 
 ```text
-vanilla_sinkhorn(a, b, C, eps, tol=?, max_iter=?) -> result
-log_sinkhorn(a, b, C, eps, tol=?, max_iter=?) -> result
-result fields: P, converged, n_iter, status, err   # confirm or edit
-status values: "converged" | "max_iter" | "numerical_failure"   # confirm or edit
-stopping rule: ?
+vanilla_sinkhorn(a, b, C, eps, *, stabilize="rowcol", tol=1e-9, max_iter=100_000) -> SinkhornResult
+log_sinkhorn(a, b, C, eps, *, stabilize="rowcol", tol=1e-9, max_iter=100_000) -> SinkhornResult
+SinkhornResult fields: P, f, g, cost, converged, n_iter, status, err
+status values: "converged" | "max_iter" | "numerical_failure"
+stopping rule: row-marginal error ||P1 - a||_1 < tol, checked before each update
+stabilize: "rowcol" (row-then-column cost shift) | "none"
 ```
 
 Decided (DECISIONS.md):
 
 - D1: zero-weight points are dropped internally; their duals are NaN and
   their rows/columns of P are zero.
-- D2: the kernel is built from the row-then-column shifted cost on the
-  support. Cost and duals are reported on the original C
+- D2: with `stabilize="rowcol"`, the solvers work on the row-then-column
+  shifted cost on the support. Cost and duals are reported on the original C
   (cost ⟨P, C⟩, duals f + α, g + β), matching `solve_exact`.
+- D5: the two solvers are separate functions with the same signature;
+  neither switches to the other.
+- D6: one frozen result class, `SinkhornResult`, for both solvers.
+- D7: vanilla follows `docs/derivation.md`; the stopping check runs before
+  each update and reuses the product the update needs.
+- D8: `log_sinkhorn` is written with the `softmin` and `slack` helpers;
+  duals start at f = g = 0 on the shifted cost.
+- D9: each solver raises `ValueError` on ε ≤ 0 or NaN, an unknown
+  `stabilize`, negative weights, or an empty support.
+- D10: `max_iter` defaults to 100,000; `err` always describes the returned
+  plan, and converging on the last allowed iteration counts as converged.
+- D11: vanilla reports `"numerical_failure"` on a non-finite or zero
+  scaling, the log solver on non-finite duals; `err` is then NaN.
+
+### `metrics.py`
+
+`lp_dual_bound(f, g, a, b, C)` returns a lower bound on the LP optimum from
+any finite duals, after a c-transform. It is tested against `solve_exact`
+in `tests/test_metrics.py`.
 
 ## POT details that cause mistakes
 
@@ -148,7 +179,7 @@ families share an ε axis.
 - For grid plots on log axes, compute cell edges in log space and use
   `shading="flat"`. `shading="nearest"` clips the outer cells.
 
-## Timing experiment (`experiments/fig4_timing.py`, figure 4)
+## Timing experiment (`experiments/fig4_timing.py`, figure 4) — pending
 
 Goal: find where vanilla stops being reliable, and what the log solver costs there.
 The figure plots cost per iteration on the left and time to convergence on
