@@ -111,7 +111,7 @@ With $u_i = e^{f_i/\varepsilon}$, $K_{ij} = e^{-C_{ij}/\varepsilon}$ and
 $v_j = e^{g_j/\varepsilon}$, this is the scaling form
 
 ```math
-P_{ij} = u_i K_{ij} v_j, \qquad P = \operatorname{diag}(u)\, K \operatorname{diag}(v).
+P_{ij} = u_i K_{ij} v_j, \qquad P = \mathrm{diag}(u)\, K \,\mathrm{diag}(v).
 ```
 
 **Why no multiplier for $P \ge 0$ is needed.** The derivative of
@@ -236,16 +236,16 @@ forming $K$ and its products.
 **Soft-min.** For a vector $z$ (eq. (4.37)),
 
 ```math
-\operatorname{min}_\varepsilon(z) = -\varepsilon \log \sum_k e^{-z_k/\varepsilon}.
+\mathrm{min}_\varepsilon(z) = -\varepsilon \log \sum_k e^{-z_k/\varepsilon}.
 ```
 
-It satisfies $`\operatorname{min}_\varepsilon(z + c) = \operatorname{min}_\varepsilon(z) + c`$
+It satisfies $`\mathrm{min}_\varepsilon(z + c) = \mathrm{min}_\varepsilon(z) + c`$
 for any constant $c$. With $c = -\underline{z}$, where
 $\underline{z} = \min_k z_k$, this gives the evaluation used in practice
 (eq. (4.42)):
 
 ```math
-\operatorname{min}_\varepsilon(z) = \underline{z}
+\mathrm{min}_\varepsilon(z) = \underline{z}
 - \varepsilon \log \sum_k e^{-(z_k - \underline{z})/\varepsilon}.
 ```
 
@@ -256,7 +256,7 @@ stable for any $\varepsilon > 0$.
 **Updates.** The $f$ update from Section 3 is a soft-min over each row:
 
 ```math
-f_i^{(\ell+1)} = \operatorname{min}_\varepsilon\big(C_{ij} - g_j^{(\ell)}\big)_j + \varepsilon \log a_i.
+f_i^{(\ell+1)} = \mathrm{min}_\varepsilon\big(C_{ij} - g_j^{(\ell)}\big)_j + \varepsilon \log a_i.
 ```
 
 Since $C_{ij} - g_j = S_{ij} + f_i$, the translation property gives the form
@@ -264,7 +264,7 @@ written with the slack:
 
 ```math
 f_i^{(\ell+1)} = f_i^{(\ell)}
-+ \operatorname{min}_\varepsilon\Big(S\big(f^{(\ell)}, g^{(\ell)}\big)_{ij}\Big)_j
++ \mathrm{min}_\varepsilon\Big(S\big(f^{(\ell)}, g^{(\ell)}\big)_{ij}\Big)_j
 + \varepsilon \log a_i.
 ```
 
@@ -272,7 +272,7 @@ Likewise, with the slack evaluated at the **updated** $f^{(\ell+1)}$:
 
 ```math
 g_j^{(\ell+1)} = g_j^{(\ell)}
-+ \operatorname{min}_\varepsilon\Big(S\big(f^{(\ell+1)}, g^{(\ell)}\big)_{ij}\Big)_i
++ \mathrm{min}_\varepsilon\Big(S\big(f^{(\ell+1)}, g^{(\ell)}\big)_{ij}\Big)_i
 + \varepsilon \log b_j.
 ```
 
@@ -284,7 +284,7 @@ alternating version converged to machine precision.
 **Interpretation.** The plan defined by a pair of potentials is
 $`P(f,g)_{ij} = e^{-S(f,g)_{ij}/\varepsilon}`$. A soft-min over a row of $S$ is
 therefore
-$`\operatorname{min}_\varepsilon\big(S_{i\cdot}\big) = -\varepsilon \log p_i`$,
+$`\mathrm{min}_\varepsilon\big(S_{i\cdot}\big) = -\varepsilon \log p_i`$,
 where $`p_i = \big(P(f^{(\ell)}, g^{(\ell)})\mathbf{1}_m\big)_i`$ is the current
 row sum. Writing $q_j$ for the column sums of $P(f^{(\ell+1)}, g^{(\ell)})$,
 the updates become
@@ -335,7 +335,7 @@ feasible $P$, so the minimizer is unchanged.
 $`K'_{ij} = e^{-(C_{ij} - \alpha_i - \beta_j)/\varepsilon}`$, so
 
 ```math
-K' = \operatorname{diag}\big(e^{\alpha/\varepsilon}\big)\, K \,\operatorname{diag}\big(e^{\beta/\varepsilon}\big).
+K' = \mathrm{diag}\big(e^{\alpha/\varepsilon}\big)\, K \,\mathrm{diag}\big(e^{\beta/\varepsilon}\big).
 ```
 
 With shifted potentials $f' = f - \alpha$ and $g' = g - \beta$,
@@ -348,7 +348,7 @@ v'_j = e^{g_j/\varepsilon} e^{-\beta_j/\varepsilon},
 and the plan is the same in both coordinates:
 
 ```math
-P = \operatorname{diag}(u')\, K' \operatorname{diag}(v') = \operatorname{diag}(u)\, K \operatorname{diag}(v).
+P = \mathrm{diag}(u')\, K' \,\mathrm{diag}(v') = \mathrm{diag}(u)\, K \,\mathrm{diag}(v).
 ```
 
 **Only floating-point behavior changes.** Running the iteration of Section 2 on
@@ -364,7 +364,7 @@ domain is required.
 
 **Recovering the outputs.**
 
-- The plan needs no rescaling: $`P = \operatorname{diag}(u') K' \operatorname{diag}(v')`$.
+- The plan needs no rescaling: $`P = \mathrm{diag}(u')\, K' \,\mathrm{diag}(v')`$.
 - The potentials are recovered in log form:
   $f = \varepsilon \log u' + \alpha$ and $g = \varepsilon \log v' + \beta$.
 - Do not form $u = u' \odot e^{\alpha/\varepsilon}$ in floating point.
@@ -383,7 +383,7 @@ domain is required.
 
 1. Compute $\alpha$, $\beta$ and $C'$, and build $K' = e^{-C'/\varepsilon}$.
 2. Initialize $`v' = \mathbf{1}_m`$ and iterate as in Section 2.
-3. Form $`P = \operatorname{diag}(u') K' \operatorname{diag}(v')`$.
+3. Form $`P = \mathrm{diag}(u')\, K' \,\mathrm{diag}(v')`$.
 4. Recover $f$ and $g$ with the formulas above.
 
 ## Differences from the printed text
