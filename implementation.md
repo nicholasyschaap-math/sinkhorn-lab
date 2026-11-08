@@ -97,15 +97,6 @@ Decided (DECISIONS.md):
 - POT's entropy term has no −1, so its objective differs from the book's by a
   constant. Compare transport plans, never objective values.
 
-## Book errata
-
-The arXiv version of Peyré and Cuturi has slips. Never transcribe formulas
-from it; use `docs/derivation.md`.
-
-- (4.43)–(4.44): the correct signs are +f and +g.
-- (4.47): with the book's H, the gap is ε(H(P*) − 1).
-- (4.41): the g update uses f^(ℓ+1), as in (4.36).
-
 ## Testing rules
 
 - Never weaken, skip or delete a test to make it pass. Report the failure.

@@ -490,3 +490,60 @@ PNGs inspected.
 - The author approved committing the branch to `main` if I saw no further
   issues. I found none: `ruff check .` passed and `pytest -q` passed before
   the merge. Fast-forward merge of `figures` into `main`.
+
+## 2026-11-07 — tests/test_metrics.py: dual bound against the LP optimum
+
+At the author's request, tests for `metrics.lp_dual_bound` against the
+certified LP optimum from `exact.py`.
+
+**Problems (6):**
+- Gaussian clouds 30×30, median-normalized;
+- Gaussian clouds 25×40 with separation 2;
+- random cost 30×20;
+- `uniform_1d` with n = 30;
+- non-uniform (Dirichlet) weights 25×20;
+- zero-mass bins 24×18.
+
+The sweep uses the log solver at ε ∈ {1, 0.3, 0.1, 0.03, 0.01} × median(C)
+on the support, capped at 20,000 iterations. Capped runs are kept, because
+any finite duals give a valid bound after the c-transform.
+
+**Tests (38 in total, about 6 s):**
+- the bound is never above the LP optimum;
+- cost − bound ≥ cost − LP;
+- the relative bound gap is non-increasing in ε, below 1e-2 at ε = 0.01,
+  and at most 0.1× its value at ε = 1;
+- exact duals recover the LP to 1e-10;
+- vanilla and log duals give the same bound;
+- arbitrary random finite duals give a valid bound (5 seeds);
+- the bound is invariant to (f + c, g − c);
+- with zero weights the bound equals the reduced-problem bound;
+- 6 kinds of bad input raise ValueError.
+
+**Mutations, applied to scratch copies of `metrics.py`** (the real file was
+never changed):
+
+| Mutation | Tests failed |
+|---|---|
+| no c-transform | 8 |
+| f₁ computed from g instead of g₁ | 18 |
+| max of the two candidates replaced by their sum | 18 |
+| a and b order reversed in the dual value | 2 |
+| support reduction removed | 1 failed, 4 errors |
+| negative-weight check removed | 1 |
+| min → max in the first c-transform | 0 |
+| only the first candidate kept | 0 |
+
+The last two leave a valid bound, so they are not correctness bugs:
+- f₁ is the c-transform of the modified g₁, so the pair stays feasible, and
+  `max()` then returns the second candidate.
+- The first candidate alone is still a valid bound.
+
+**Relative bound gap (LP − bound)/LP found:**
+- the bound never exceeded the LP in any of the 30 runs;
+- it tightened monotonically;
+- at ε = 0.01 it was 0 to 0.75%;
+- on the 30×30 clouds it equalled the LP to rounding at ε ≤ 0.03, even
+  though Sinkhorn hit the cap.
+
+**Verification:** `ruff check .` passed; `pytest -q` 313 passed.
