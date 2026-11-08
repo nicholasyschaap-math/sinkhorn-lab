@@ -5,7 +5,7 @@ This file derives the vanilla, log-domain and shifted Sinkhorn updates used in
 problem. It is the formula source for the code: where it differs from the
 printed text of the references, this file is the one to follow.
 
-Every identity below was also checked numerically on small random instances.
+Some of the claims below were also checked numerically on small random instances.
 
 ## Notation and conventions
 
@@ -15,18 +15,18 @@ Every identity below was also checked numerically on small random instances.
 | $C \in \mathbb{R}^{n \times m}$ | Cost matrix |
 | $\varepsilon > 0$ | Regularization strength |
 | $\langle P, C \rangle$ | $\sum_{i,j} P_{ij} C_{ij}$ |
-| $(f \oplus g)_{ij}$ | $f_i + g_j$ |
+| $`(f \oplus g)_{ij}`$ | $f_i + g_j$ |
 | $\odot$, $/$ | Entrywise product and division |
-| $\mathbf{1}_n$ | The all-ones vector of length $n$ |
+| $`\mathbf{1}_n`$ | The all-ones vector of length $n$ |
 | $K$ | The Gibbs kernel, $K_{ij} = e^{-C_{ij}/\varepsilon}$ |
 | $S(f, g)$ | The slack matrix, $S(f,g) = C - f \oplus g$ |
 | $\ell$ | Iteration index |
 
 **Entropy.** This file uses the convention of Peyré and Cuturi, eq. (4.1):
 
-$$
+```math
 H(P) = -\sum_{i,j} P_{ij}\,(\log P_{ij} - 1), \qquad 0 \log 0 = 0.
-$$
+```
 
 Cuturi (2013) and POT drop the $-1$. Over couplings of unit mass the two
 entropies differ by a constant, so they give the same optimal plan but
@@ -69,43 +69,43 @@ in detail; Section 5 is a one-time version of that idea.
 
 The regularized problem (Peyré and Cuturi, (4.2)) is
 
-$$
+```math
 L^\varepsilon_C(a,b) = \min_{P \in U(a,b)} \; \langle P, C \rangle - \varepsilon H(P),
 \qquad U(a,b) = \{P \ge 0 : P\mathbf{1}_m = a,\; P^\top \mathbf{1}_n = b\}.
-$$
+```
 
 Introduce multipliers $f \in \mathbb{R}^n$ and $g \in \mathbb{R}^m$ for the two
 marginal constraints:
 
-$$
+```math
 \mathcal{E}(P, f, g) = \langle P, C \rangle - \varepsilon H(P)
 - \langle f, P\mathbf{1}_m - a \rangle - \langle g, P^\top \mathbf{1}_n - b \rangle.
-$$
+```
 
 Written in coordinates,
 
-$$
+```math
 \mathcal{E}(P, f, g) = \sum_{i,j} P_{ij} C_{ij}
 + \varepsilon \sum_{i,j} P_{ij}(\log P_{ij} - 1)
 - \sum_i f_i \Big(\sum_j P_{ij} - a_i\Big)
 - \sum_j g_j \Big(\sum_i P_{ij} - b_j\Big).
-$$
+```
 
 Differentiate with respect to one entry $P_{ij}$. The terms $f_i a_i$ and
 $g_j b_j$ do not depend on $P$, and
 $\frac{\partial}{\partial P_{ij}} \big[P_{ij}(\log P_{ij} - 1)\big] = \log P_{ij}$, so
 
-$$
+```math
 \frac{\partial \mathcal{E}}{\partial P_{ij}} = C_{ij} + \varepsilon \log P_{ij} - f_i - g_j = 0.
-$$
+```
 
 Solving for $P_{ij}$:
 
-$$
+```math
 \varepsilon \log P_{ij} = f_i - C_{ij} + g_j
 \quad\Longrightarrow\quad
 P_{ij} = e^{f_i/\varepsilon}\, e^{-C_{ij}/\varepsilon}\, e^{g_j/\varepsilon}.
-$$
+```
 
 With $u_i = e^{f_i/\varepsilon}$, $K_{ij} = e^{-C_{ij}/\varepsilon}$ and
 $v_j = e^{g_j/\varepsilon}$, this is the scaling form
@@ -124,30 +124,30 @@ the solution is unique. This is the argument behind Proposition 4.3.
 
 Substitute the scaling form into the two marginal constraints.
 
-Row sums: $\sum_j u_i K_{ij} v_j = u_i (Kv)_i = a_i$.
+Row sums: $`\sum_j u_i K_{ij} v_j = u_i (Kv)_i = a_i`$.
 
-Column sums: $\sum_i u_i K_{ij} v_j = v_j (K^\top u)_j = b_j$.
+Column sums: $`\sum_i u_i K_{ij} v_j = v_j (K^\top u)_j = b_j`$.
 
 In vector form (Peyré and Cuturi, (4.14)):
 
-$$
+```math
 u \odot (Kv) = a, \qquad v \odot (K^\top u) = b.
-$$
+```
 
 Each equation is easy to solve for one vector when the other is fixed, so we
-alternate. Starting from $v^{(0)} = \mathbf{1}_m$ (eq. (4.15)):
+alternate. Starting from $`v^{(0)} = \mathbf{1}_m`$ (eq. (4.15)):
 
-$$
+```math
 u^{(\ell+1)} = \frac{a}{K v^{(\ell)}}, \qquad
 v^{(\ell+1)} = \frac{b}{K^\top u^{(\ell+1)}}.
-$$
+```
 
 The $v$ update uses the new $u^{(\ell+1)}$. Combining the two steps gives a
 single update in $v$:
 
-$$
+```math
 v^{(\ell+1)} = \frac{b}{K^\top \big(a / (K v^{(\ell)})\big)}.
-$$
+```
 
 Right after a $v$ update the column marginal holds exactly by construction, so
 convergence should be measured on the row marginal,
@@ -162,25 +162,25 @@ $P_{ij}(f,g) = e^{(f_i + g_j - C_{ij})/\varepsilon}$, is its minimizer.
 Substituting it back gives the Lagrange dual function
 $Q(f,g) = \min_P \mathcal{E}(P, f, g)$. Term by term:
 
-$$
+```math
 -\varepsilon H(P) = \varepsilon \sum_{i,j} P_{ij}\big(\log P_{ij} - 1\big)
 = \sum_{i,j} P_{ij}(f_i + g_j - C_{ij}) - \varepsilon \sum_{i,j} P_{ij},
-$$
+```
 
-$$
+```math
 -\langle f, P\mathbf{1}_m - a \rangle - \langle g, P^\top \mathbf{1}_n - b \rangle
 = -\sum_{i,j} P_{ij}(f_i + g_j) + \langle f, a \rangle + \langle g, b \rangle,
-$$
+```
 
 and $\langle P, C \rangle = \sum_{i,j} P_{ij} C_{ij}$. In the sum, the
 $P_{ij}C_{ij}$ and $P_{ij}(f_i + g_j)$ terms cancel, leaving
 
-$$
+```math
 Q(f,g) = \langle f, a \rangle + \langle g, b \rangle
 - \varepsilon \sum_{i,j} e^{(f_i + g_j - C_{ij})/\varepsilon}
 = \langle f, a \rangle + \langle g, b \rangle
 - \varepsilon \big\langle e^{f/\varepsilon}, K e^{g/\varepsilon} \big\rangle.
-$$
+```
 
 This is the dual problem of Proposition 4.4, eq. (4.30). The problem is convex
 and $P = ab^\top$ is strictly feasible, so strong duality holds:
@@ -188,27 +188,27 @@ $\max_{f,g} Q(f,g) = L^\varepsilon_C(a,b)$.
 
 **The gradient is the marginal error.**
 
-$$
+```math
 \frac{\partial Q}{\partial f_i} = a_i - e^{f_i/\varepsilon} \sum_j K_{ij} e^{g_j/\varepsilon}
 = a_i - \big(P(f,g)\mathbf{1}_m\big)_i,
 \qquad
 \frac{\partial Q}{\partial g_j} = b_j - \big(P(f,g)^\top \mathbf{1}_n\big)_j.
-$$
+```
 
 **Exact block maximization.** Setting the $f$ block of the gradient to zero
 with $g$ fixed:
 
-$$
+```math
 e^{f_i/\varepsilon} = \frac{a_i}{\big(K e^{g/\varepsilon}\big)_i}
 \quad\Longrightarrow\quad
 f_i = \varepsilon \log a_i - \varepsilon \log \big(K e^{g/\varepsilon}\big)_i,
-$$
+```
 
 and similarly
 
-$$
+```math
 g_j = \varepsilon \log b_j - \varepsilon \log \big(K^\top e^{f/\varepsilon}\big)_j.
-$$
+```
 
 With $u = e^{f/\varepsilon}$ and $v = e^{g/\varepsilon}$ these are
 $u = a / (Kv)$ and $v = b / (K^\top u)$, the updates of Section 2.
@@ -220,7 +220,7 @@ Sinkhorn is therefore block coordinate ascent on $Q$ (Remark 4.21).
 
 Two cautions:
 
-- $Q(f + c\mathbf{1}_n,\, g - c\mathbf{1}_m) = Q(f, g)$ for every constant
+- $`Q(f + c\mathbf{1}_n,\, g - c\mathbf{1}_m) = Q(f, g)`$ for every constant
   $c$, so optimal potentials are unique only up to this shift. Compare
   potentials from different runs up to a constant.
 - Concavity alone does not guarantee that block coordinate ascent converges.
@@ -229,15 +229,15 @@ Two cautions:
 ## 4. Log-domain updates
 
 For small $\varepsilon$, entries $e^{-C_{ij}/\varepsilon}$ of the kernel
-underflow to 0. If an entire row of $K$ underflows, $(Kv)_i = 0$ and the
-update $u_i = a_i/(Kv)_i$ divides by zero. Working with $f, g$ directly avoids
+underflow to 0. If an entire row of $K$ underflows, $`(Kv)_i = 0`$ and the
+update $`u_i = a_i/(Kv)_i`$ divides by zero. Working with $f, g$ directly avoids
 forming $K$ and its products.
 
 **Soft-min.** For a vector $z$ (eq. (4.37)),
 
-$$
+```math
 \operatorname{min}_\varepsilon(z) = -\varepsilon \log \sum_k e^{-z_k/\varepsilon}.
-$$
+```
 
 It satisfies $`\operatorname{min}_\varepsilon(z + c) = \operatorname{min}_\varepsilon(z) + c`$
 for any constant $c$. With $c = -\underline{z}$, where
@@ -255,9 +255,9 @@ stable for any $\varepsilon > 0$.
 
 **Updates.** The $f$ update from Section 3 is a soft-min over each row:
 
-$$
+```math
 f_i^{(\ell+1)} = \operatorname{min}_\varepsilon\big(C_{ij} - g_j^{(\ell)}\big)_j + \varepsilon \log a_i.
-$$
+```
 
 Since $C_{ij} - g_j = S_{ij} + f_i$, the translation property gives the form
 written with the slack:
@@ -278,23 +278,22 @@ g_j^{(\ell+1)} = g_j^{(\ell)}
 
 These are eqs. (4.43)–(4.44). Using $f^{(\ell)}$ in the $g$ update instead
 turns the method into a simultaneous update, which is not block coordinate
-ascent. In a test on a $12 \times 17$ instance at $\varepsilon = 0.3$, that
-version still had marginal error 5.8 after 3,000 iterations, while the
+ascent. In numerical tests that version failed to converge, while the
 alternating version converged to machine precision.
 
 **Interpretation.** The plan defined by a pair of potentials is
-$P(f,g)_{ij} = e^{-S(f,g)_{ij}/\varepsilon}$. A soft-min over a row of $S$ is
+$`P(f,g)_{ij} = e^{-S(f,g)_{ij}/\varepsilon}`$. A soft-min over a row of $S$ is
 therefore
 $`\operatorname{min}_\varepsilon\big(S_{i\cdot}\big) = -\varepsilon \log p_i`$,
-where $p_i = \big(P(f^{(\ell)}, g^{(\ell)})\mathbf{1}_m\big)_i$ is the current
+where $`p_i = \big(P(f^{(\ell)}, g^{(\ell)})\mathbf{1}_m\big)_i`$ is the current
 row sum. Writing $q_j$ for the column sums of $P(f^{(\ell+1)}, g^{(\ell)})$,
 the updates become
 
-$$
+```math
 f_i^{(\ell+1)} = f_i^{(\ell)} + \varepsilon \log \frac{a_i}{p_i},
 \qquad
 g_j^{(\ell+1)} = g_j^{(\ell)} + \varepsilon \log \frac{b_j}{q_j}.
-$$
+```
 
 Each correction is zero exactly when the corresponding marginal is matched and
 shrinks as the marginals approach $a$ and $b$. The size of the correction,
@@ -302,19 +301,21 @@ $\varepsilon \lvert \log(a_i/p_i) \rvert$, measures a relative error, which
 gives small-mass bins more weight than the absolute $L^1$ error of Section 2.
 To compare solvers, stop both on the same marginal error.
 
-**Cost.** Each soft-min evaluates an exponential for every entry, so one
-iteration costs $nm$ exponentials, compared with two matrix–vector products
-for vanilla Sinkhorn (Remark 4.23).
+**Cost.** Each iteration forms the slack matrix twice, at
+$(f^{(\ell)}, g^{(\ell)})$ for the $f$ update and at $(f^{(\ell+1)}, g^{(\ell)})$
+for the $g$ update, and each soft-min evaluates an exponential for every entry
+of its slack matrix. One iteration therefore costs $2nm$ exponentials,
+compared with two matrix–vector products for vanilla Sinkhorn (Remark 4.23).
 
 ## 5. Vanilla Sinkhorn with a row/column shift
 
 **The shift.** Let
 
-$$
+```math
 \alpha_i = \min_j C_{ij}, \qquad
 \beta_j = \min_i \big(C_{ij} - \alpha_i\big), \qquad
 C' = C - \alpha \oplus \beta.
-$$
+```
 
 Then $C' \ge 0$, and every row and every column of $C'$ contains a zero. In
 the notation of Section 4, $C' = S(\alpha, \beta)$: the shift is the slack
@@ -322,16 +323,16 @@ evaluated at the potentials $(\alpha, \beta)$.
 
 **The plan does not change.** For every $P \in U(a,b)$,
 
-$$
+```math
 \langle P, \alpha \oplus \beta \rangle = \langle \alpha, a \rangle + \langle \beta, b \rangle,
-$$
+```
 
 which does not depend on $P$, and $H(P)$ does not involve $C$. Replacing $C$
-with $C'$ therefore lowers the objective by the same constant for every
+with $C'$ therefore shifts the objective by the same constant for every
 feasible $P$, so the minimizer is unchanged.
 
 **Scalings.** The shifted kernel is
-$K'_{ij} = e^{-(C_{ij} - \alpha_i - \beta_j)/\varepsilon}$, so
+$`K'_{ij} = e^{-(C_{ij} - \alpha_i - \beta_j)/\varepsilon}`$, so
 
 ```math
 K' = \operatorname{diag}\big(e^{\alpha/\varepsilon}\big)\, K \,\operatorname{diag}\big(e^{\beta/\varepsilon}\big).
@@ -339,10 +340,10 @@ K' = \operatorname{diag}\big(e^{\alpha/\varepsilon}\big)\, K \,\operatorname{dia
 
 With shifted potentials $f' = f - \alpha$ and $g' = g - \beta$,
 
-$$
+```math
 u'_i = e^{f_i/\varepsilon} e^{-\alpha_i/\varepsilon}, \qquad
 v'_j = e^{g_j/\varepsilon} e^{-\beta_j/\varepsilon},
-$$
+```
 
 and the plan is the same in both coordinates:
 
@@ -351,7 +352,7 @@ P = \operatorname{diag}(u')\, K' \operatorname{diag}(v') = \operatorname{diag}(u
 ```
 
 **Only floating-point behavior changes.** Running the iteration of Section 2 on
-$K'$ from $v'^{(0)} = \mathbf{1}_m$ produces exactly the iterates of the
+$K'$ from $`v'^{(0)} = \mathbf{1}_m`$ produces exactly the iterates of the
 original iteration on $K$ started from $v^{(0)} = e^{\beta/\varepsilon}$, with
 $u^{(\ell)} = u'^{(\ell)} \odot e^{\alpha/\varepsilon}$ and
 $v^{(\ell)} = v'^{(\ell)} \odot e^{\beta/\varepsilon}$ at every step. The
@@ -363,7 +364,7 @@ domain is required.
 
 **Recovering the outputs.**
 
-- The plan needs no rescaling: $P = \operatorname{diag}(u') K' \operatorname{diag}(v')$.
+- The plan needs no rescaling: $`P = \operatorname{diag}(u') K' \operatorname{diag}(v')`$.
 - The potentials are recovered in log form:
   $f = \varepsilon \log u' + \alpha$ and $g = \varepsilon \log v' + \beta$.
 - Do not form $u = u' \odot e^{\alpha/\varepsilon}$ in floating point.
@@ -371,7 +372,7 @@ domain is required.
   about 709, which is exactly the regime where the shift matters.
 - Compute the transport cost as $\langle P, C \rangle$ with the original $C$.
   The identity
-  $\langle P, C \rangle = \langle P, C' \rangle + \langle \alpha, P\mathbf{1}_m \rangle + \langle \beta, P^\top\mathbf{1}_n \rangle$
+  $`\langle P, C \rangle = \langle P, C' \rangle + \langle \alpha, P\mathbf{1}_m \rangle + \langle \beta, P^\top\mathbf{1}_n \rangle`$
   reduces to adding $\langle \alpha, a \rangle + \langle \beta, b \rangle$ only
   when $P$ matches both marginals exactly, which Sinkhorn iterates do not.
 - The dual value can be computed in shifted coordinates:
@@ -381,8 +382,8 @@ domain is required.
 **Procedure.**
 
 1. Compute $\alpha$, $\beta$ and $C'$, and build $K' = e^{-C'/\varepsilon}$.
-2. Initialize $v' = \mathbf{1}_m$ and iterate as in Section 2.
-3. Form $P = \operatorname{diag}(u') K' \operatorname{diag}(v')$.
+2. Initialize $`v' = \mathbf{1}_m`$ and iterate as in Section 2.
+3. Form $`P = \operatorname{diag}(u') K' \operatorname{diag}(v')`$.
 4. Recover $f$ and $g$ with the formulas above.
 
 ## Differences from the printed text
@@ -392,17 +393,6 @@ Checked against the current arXiv version of Peyré and Cuturi.
 - **Eqs. (4.39) and (4.41)** use $f^{(\ell)}$ in the $g$ update. Follow
   eqs. (4.36) and (4.44), which use $f^{(\ell+1)}$. Section 4 shows the
   simultaneous version failing to converge.
-- **Eq. (4.47)** states $\mathfrak{P}^\varepsilon_C - \mathfrak{D}^\varepsilon_C = \varepsilon\big(H(P^\star) + 1\big)$,
-  where Definition 4.1 sets $\mathfrak{P}^\varepsilon_C = \langle C, P^\star \rangle$
-  and $\mathfrak{D}^\varepsilon_C = \langle f^\star, a \rangle + \langle g^\star, b \rangle$.
-  With $H$ as in eq. (4.1), strong duality gives
-  $\langle C, P^\star\rangle - \varepsilon H(P^\star) = Q(f^\star, g^\star) = \mathfrak{D}^\varepsilon_C - \varepsilon$,
-  since $P^\star$ has unit mass. Hence
-  $\mathfrak{P}^\varepsilon_C - \mathfrak{D}^\varepsilon_C = \varepsilon\big(H(P^\star) - 1\big)$.
-  This was confirmed numerically at $\varepsilon = 1$ and $0.3$.
-- **Eqs. (4.43)–(4.44)** print $+f^{(\ell)}$ and $+g^{(\ell)}$ in this version,
-  which agrees with Section 4.
-
 
 ## References
 
